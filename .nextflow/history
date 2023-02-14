@@ -1,0 +1,38 @@
+2022-09-20 17:35:06	1m 19s	grave_hoover	ERR	8faf9ff27e7efe27260c150fc3f58d24	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton
+2022-09-20 17:36:31	15m 28s	reverent_mandelbrot	ERR	8faf9ff27e7efe27260c150fc3f58d24	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-20 17:54:50	-	nasty_mayer	-	83da17a4cb7b0a3c2c105e4f10f8f73e	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-20 17:55:20	2.9s	irreverent_hoover	ERR	53e813cf4dd46b38a2af3b0b6e46a7c7	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-20 17:58:17	16m 18s	hopeful_bartik	ERR	6a1a9bfee30cc999e6eaf0c556fc5862	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:03:37	2m 6s	stoic_bhabha	ERR	900bdff9cf5009810b43be6794cc52b4	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:05:48	14m 18s	voluminous_lamarr	ERR	900bdff9cf5009810b43be6794cc52b4	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:22:05	13s	nauseous_pauling	ERR	e286515d7f1229ab77ec69b1649c1c4c	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:22:43	12.8s	nasty_golick	ERR	fbe82e3593852b9d94216c3b987060c1	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:25:58	12.8s	curious_kare	ERR	b0fb0804d2a75038298ec57247b533f7	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:30:07	4m 30s	romantic_galileo	ERR	900bdff9cf5009810b43be6794cc52b4	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:34:59	2m 3s	romantic_monod	ERR	126373634be910e4684e8a1ca1aed6b4	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:37:06	4m 15s	reverent_sanger	ERR	382e56892ce7a5bf79269f656916db07	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:41:31	-	infallible_leakey	-	f04a158e39c41d3d215805dc2c594b45	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:42:40	-	sad_gilbert	-	94572d2404dbda9e5479127a19732db3	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 06:43:40	19m 43s	adoring_bartik	ERR	143489bc5cc509c9c5056feefeddf251	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:10:18	11.8s	hungry_mercator	ERR	143489bc5cc509c9c5056feefeddf251	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:12:37	27.8s	kickass_chandrasekhar	ERR	49f8fdd48ddcd552933a76dced71ec1c	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:16:33	11.9s	voluminous_brahmagupta	ERR	143489bc5cc509c9c5056feefeddf251	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:18:18	-	crazy_lamarck	-	69a3805afcd056e5e1b04d3903914f80	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:18:31	3.1s	kickass_mccarthy	ERR	196fb0da31d781a73a2d1ec365e2a0f8	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:19:16	-	sharp_kimura	-	e158995517f1e1010d7d291a1ea9a0e9	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:20:58	-	sick_mandelbrot	-	c1b70329d09831b7a3e643a2f1523a07	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:21:24	-	goofy_fermat	-	5c50e028c6f3ed2621857aceca298bb7	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:22:27	-	kickass_lalande	-	50254989562bec3a78db6c895578da08	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:23:57	-	wise_austin	-	748625513af18f50661c3fb481e347a4	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:25:26	3m 2s	prickly_cori	ERR	8523346c26536938ed09bede3dc33f7d	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:32:40	21.2s	hungry_fermat	ERR	e0a06e8ade1dbe16cbfc12c3ccaa6076	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:34:20	23s	spontaneous_dubinsky	ERR	438611430bf003b54d98f800df9b3d4b	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:40:22	-	adoring_bardeen	-	ffe63c7104f21538ae391b78dac5d217	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:40:46	11.1s	hungry_curran	ERR	52ae63e37aa1b6d1737b557ebaec6366	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 07:48:14	19m 18s	intergalactic_bell	ERR	3939f271f20ee0d086e4b7efc034358e	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 08:34:51	17.9s	nice_nobel	ERR	7188ce45b4318441875f9452c460657c	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 08:37:49	-	determined_lalande	-	850ad804f95f662fc6867857a457a6c7	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 08:38:23	-	determined_keller	-	046feb79fae903b2c25779fb8063efe2	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 08:39:04	11s	hopeful_liskov	ERR	73fcb6fc6ec8ef8fe29cc4f4e8e64c77	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 08:39:18	30.9s	magical_linnaeus	ERR	73fcb6fc6ec8ef8fe29cc4f4e8e64c77	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume
+2022-09-21 08:39:54	17.5s	lonely_keller	ERR	980c662f9e3605613cc40cc85470f0aa	5c001f94-052e-40f9-9b8a-360323f5917e	nextflow run main.nf -profile teton -resume

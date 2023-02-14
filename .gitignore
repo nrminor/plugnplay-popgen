@@ -1,0 +1,9 @@
+work/
+results/
+
+resources/*.fna
+resources/*.fasta
+resources/*.fa
+.nextflow.log*
+report.html*
+trace.txt*
