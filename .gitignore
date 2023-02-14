@@ -1,5 +1,6 @@
 work/
 results/
+.nextflow/
 
 resources/*.fna
 resources/*.fasta
