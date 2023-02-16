@@ -47,7 +47,7 @@ workflow {
 		MERGE_VCFS.out,
 		ch_vcfs
 			.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, population }
-			.collect { unique(it[1]) }
+			.groupTuple( by: 1 )
 	)
 	
 	VISUALIZE_SFS (
@@ -58,8 +58,8 @@ workflow {
 		SFS_ESTIMATION.out.sfs,
 		ch_vcfs
 			.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, population }
-			.collect { unique(it[1]) }
-			.count()
+			.groupTuple( by: 1 )
+			.countBy { it[0] }
 	)
 	
 	STAIRWAY_PLOT ( 
@@ -322,9 +322,58 @@ process STAIRWAY_PLOT {
 	
 }
 
-process POP_STRUCTURE_PCA {}
+process POP_STRUCTURE_PCA {
+	
+	container 'plink container'
+	
+	input:
+	tuple path(snps), val(species), val(pop), val(prep)
+	
+	output:
+	
+	when:
+	params.principal_component_analysis == true
+	
+	script:
+	"""
+	
+	plink --vcf ${snps} --double-id --allow-extra-chr \
+	--set-missing-var-ids @:#\$1,\$2 \
+	--indep-pairwise 50 10 0.1 --out ${species}_${pop}_${prep}_${params.date}
+	
+	plink --vcf ${snps} --double-id --allow-extra-chr --set-missing-var-ids @:#\$1,\$2 \
+	--extract ${species}_${pop}_${prep}_${params.date}.prune.in \
+	--make-bed --pca --out ${species}_${pop}_${prep}_${params.date}
+	
+	"""
+	
+}
 
-process ADMIXTURE_PLOT {}
+process ADMIXTURE_PLOT {
+	
+	input:
+	tuple path(snps), val(species), val(pop), val(prep)
+	
+	output:
+	path "*."
+	
+	when:
+	params.admixture_plot == true
+	
+	script:
+	output_prefix = species "_" pop "_" + prep + "_admix"
+	"""
+	# Create a temporary plink file for ADMIXTURE
+	plink --vcf ${snps} --recode --allow-extra-chr --out ${output_prefix}
+	
+	# Run ADMIXTURE on the plink file
+	admixture --cv ${output_prefix}.ped \
+	${params.admixture_plot_K} | tee ${output_prefix}.log
+	
+	# Plot ADMIXTURE results using the R script provided with ADMIXTURE
+	Rscript plot_admixture.R ${output_prefix} ${params.admixture_plot_K}
+	"""
+}
 
 
 

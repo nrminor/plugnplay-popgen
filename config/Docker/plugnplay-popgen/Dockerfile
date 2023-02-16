@@ -1,0 +1,89 @@
+# This Dockerfile was written with ChatGPT Feb 13 Version. Free Research Preview 
+# https://help.openai.com/en/articles/6825453-chatgpt-release-notes
+# Start with the latest miniconda3 image
+FROM continuumio/miniconda3:latest
+
+# Update and install necessary packages
+RUN apt-get update && apt-get install -y \
+	build-essential \
+	curl \
+	default-jre \
+	wget \
+	r-base \
+	bcftools \
+	vcftools \
+	procps \
+	&& apt-get clean \
+	&& rm -rf /var/lib/apt/lists/*
+
+# Install R-tidyverse
+RUN Rscript -e 'install.packages("tidyverse")'
+
+# Install necessary packages with conda
+RUN conda install -y \
+	numpy \
+	pandas \
+	scipy \
+	&& conda clean -ya
+
+# Install Plink
+RUN wget http://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20211016.zip -O /tmp/plink.zip && \
+	unzip /tmp/plink.zip -d /usr/local/bin && \
+	rm /tmp/plink.zip
+
+# Install ANGSD
+RUN wget https://github.com/ANGSD/angsd/archive/0.933.tar.gz -O /tmp/angsd.tar.gz && \
+	tar xvf /tmp/angsd.tar.gz -C /tmp/ && \
+	cd /tmp/angsd-0.933 && \
+	make HTSlib && \
+	make && \
+	cp angsd /usr/local/bin && \
+	cd / && \
+	rm -rf /tmp/angsd*
+
+# Install Nextflow
+RUN curl -s https://get.nextflow.io | bash
+
+# Install Dsuite
+RUN pip install Dsuite
+
+# Install ADMIXTURE
+RUN wget https://dalexander.github.io/admixture/binaries/admixture_linux-1.3.0.tar.gz -O /tmp/admixture.tar.gz && \
+	tar xvf /tmp/admixture.tar.gz -C /usr/local/bin && \
+	rm /tmp/admixture.tar.gz
+
+# Install STRUCTURE
+RUN wget https://web.stanford.edu/group/pritchardlab/structure_software/release_versions/v2.3.4/structure_linux_console.tar.gz -O /tmp/structure.tar.gz && \
+	tar xvf /tmp/structure.tar.gz -C /usr/local/bin && \
+	rm /tmp/structure.tar.gz
+
+# Install EEMS
+RUN wget https://github.com/dipetkov/eems/archive/master.tar.gz -O /tmp/eems.tar.gz && \
+	tar xvf /tmp/eems.tar.gz -C /usr/local/bin && \
+	mv /usr/local/bin/eems-master /usr/local/bin/eems && \
+	rm /tmp/eems.tar.gz
+
+# Install stairway-plot-v2
+RUN wget https://sites.google.com/site/jpopgen/stairway-plot/stairway_plot_v2_0.zip?attredirects=0 -O /tmp/stairway.zip && \
+	unzip /tmp/stairway.zip -d /usr/local/bin && \
+	chmod +x /usr/local/bin/stairway_plot_v2 && \
+	rm /tmp/stairway.zip
+
+# Install easySFS
+RUN wget https://github.com/isaacovercast/easySFS/archive/master.tar.gz -O /tmp/easysfs.tar.gz && \
+	tar xvf /tmp/easysfs.tar.gz -C /usr/local/bin && \
+	mv /usr/local/bin/easySFS-master /usr/local/bin/easysfs && \
+	rm /tmp/easysfs.tar.gz
+
+# Add Nextflow to the PATH
+ENV PATH="/nextflow:${PATH}"
+
+# Set up the working directory
+WORKDIR /app
+
+# Copy the current directory into the container
+COPY . .
+
+# Set up the entry point
+ENTRYPOINT ["bash"]
+

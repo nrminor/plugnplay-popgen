@@ -1,0 +1,50 @@
+Bootstrap: docker
+From: biocontainers/biocontainers:latest
+
+# Install basic utilities
+%post
+	apt-get update
+	apt-get install -y wget curl unzip vim git make
+
+# Install Miniconda3
+%post
+	wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh
+	bash /tmp/miniconda.sh -b -p $HOME/miniconda
+	rm /tmp/miniconda.sh
+	export PATH=$HOME/miniconda/bin:$PATH
+
+# Install some bioinformatics and genomic analysis tools
+%post
+	conda install -c bioconda samtools bcftools vcftools plink admixture structure nextflow pandas scipy numpy r-base r-tidyverse
+
+%post
+	# Install ANGSD
+	git clone https://github.com/ANGSD/angsd.git
+	cd angsd
+	make HTSLIB_PATH=/usr/local
+
+%post
+	# Install Dsuite
+	pip install Dsuite
+
+%post
+	# Install EEMS
+	git clone https://github.com/dipetkov/eems.git
+	cd eems/src
+	make
+
+%post
+	# Install stairwayplot
+	wget https://sites.google.com/site/jpopgen/stairway-plot-v2/stairway_plot_v2.1.1.zip -O /tmp/stairway_plot_v2.zip
+	unzip /tmp/stairway_plot_v2.zip -d /usr/local/bin
+	chmod +x /usr/local/bin/stairway_plot_v2
+
+%post
+	# Install easySFS
+	git clone https://github.com/isaacovercast/easySFS.git
+	cd easySFS
+	make
+
+# Set up environment variables
+%environment
+	export PATH=$HOME/miniconda/bin:$PATH
