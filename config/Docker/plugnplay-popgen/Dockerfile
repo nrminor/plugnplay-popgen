@@ -31,8 +31,13 @@ RUN conda install -y -c conda-forge -c anaconda -c bioconda \
 # Install Nextflow
 RUN curl -s https://get.nextflow.io | bash
 
+# Add Nextflow to the PATH
+ENV PATH="/nextflow:${PATH}"
+
 # Install Dsuite
-RUN pip install Dsuite
+RUN git clone https://github.com/millanek/Dsuite.git && \
+	cd Dsuite && \
+	make
 
 # Install ADMIXTURE
 RUN wget https://dalexander.github.io/admixture/binaries/admixture_linux-1.3.0.tar.gz -O /tmp/admixture.tar.gz && \
@@ -61,9 +66,6 @@ RUN wget https://github.com/isaacovercast/easySFS/archive/master.tar.gz -O /tmp/
 	tar xvf /tmp/easysfs.tar.gz -C /usr/local/bin && \
 	mv /usr/local/bin/easySFS-master /usr/local/bin/easysfs && \
 	rm /tmp/easysfs.tar.gz
-
-# Add Nextflow to the PATH
-ENV PATH="/nextflow:${PATH}"
 
 # Set up the working directory
 WORKDIR /app
