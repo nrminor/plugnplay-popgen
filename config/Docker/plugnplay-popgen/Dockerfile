@@ -25,17 +25,8 @@ RUN conda install -y -c conda-forge -c anaconda -c bioconda \
 	pandas \
 	scipy \
 	plink \
+	angsd \
 	&& conda clean -ya
-
-# Install ANGSD
-RUN wget https://github.com/ANGSD/angsd/archive/0.933.tar.gz -O /tmp/angsd.tar.gz && \
-	tar xvf /tmp/angsd.tar.gz -C /tmp/ && \
-	cd /tmp/angsd-0.933 && \
-	make HTSlib && \
-	make && \
-	cp angsd /usr/local/bin && \
-	cd / && \
-	rm -rf /tmp/angsd*
 
 # Install Nextflow
 RUN curl -s https://get.nextflow.io | bash
