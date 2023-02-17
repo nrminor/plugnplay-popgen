@@ -31,11 +31,13 @@ workflow {
 	MERGE_VCFS (
 		SNP_FILTERING.out.vcf
 			.filter { it[3] == "WGS" }
-			.collect { unique(it[1]) }
+			.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, species, prep_type }
+			.groupTuple( by: 1 )
 			.mix (
 				SNP_FILTERING.out.vcf
 				.filter { it[3] == "RAD" }
-				.collect { unique(it[1]) }
+				.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, species, prep_type }
+				.groupTuple( by: 1 )
 			)
 	)
 	
@@ -43,11 +45,16 @@ workflow {
 		MERGE_VCFS.out
 	)
 	
+	MAKE_POP_MAP (
+		ch_vcfs
+			.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, species, population }
+			.groupTuple( by: 1 )
+			.collectFile( name: "pop_map.txt", newLine: true )
+	)
+	
 	SFS_ESTIMATION (
 		MERGE_VCFS.out,
-		ch_vcfs
-			.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, population }
-			.groupTuple( by: 1 )
+		MAKE_POP_MAP.out
 	)
 	
 	VISUALIZE_SFS (
@@ -57,7 +64,7 @@ workflow {
 	BUILD_STAIRWAY_PLOT_SCRIPT (
 		SFS_ESTIMATION.out.sfs,
 		ch_vcfs
-			.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, population }
+			.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, species }
 			.groupTuple( by: 1 )
 			.countBy { it[0] }
 	)
@@ -93,6 +100,7 @@ params.angsd_sfs_plots = params.angsd_results + "/" + "SFS_plots"
 params.stairway_plots = params.analyses + "/" + "Stairway_plots"
 params.stairway_plot_run_date = params.analyses + "/" + "Stairway_plots" + "/" + ${params.date}
 params.admixture_results = params.analyses + "/" + "admixture_plots"
+params.pca_results = params.analyses + "/" + "PCA_plots"
 
 // --------------------------------------------------------------- //
 
@@ -173,10 +181,11 @@ process MERGE_VCFS {
 	cpus 8
 	
 	input:
-	tuple val(sample), val(species), val(pop), val(prep), val(platform), path(vcf_files)
+	tuple tuple(vcf_files), val(species), val(prep)
+	tuple tuple()
 	
 	output:
-	tuple path("*${species}*.vcf.gz"), val(species), val(pop), val(prep)
+	tuple path("*${species}*.vcf.gz"), val(species), val(prep)
 	
 	script:
 	"""
@@ -184,9 +193,16 @@ process MERGE_VCFS {
 	bcftools merge \
 	--merge snps \
 	--output-type z \
-	--threads 8 \
+	--threads ${task.cpus} \
 	--output ${species}_multisample_${prep}.vcf.gz
 	*${species}*.vcf.gz
+	
+	touch vcf_filter_settings_!{params.date}.txt
+	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> vcf_filter_settings_!{params.date}.txt
+	echo "Minimum samples: ${minInd}" >> vcf_filter_settings_!{params.date}.txt
+	echo "Minimum variant quality score: !{params.min_quality}" >> vcf_filter_settings_!{params.date}.txt
+	echo "Minimum Depth: !{params.min_depth}" >> vcf_filter_settings_!{params.date}.txt
+	echo "Maximum Depth: !{params.max_depth}" >> vcf_filter_settings_!{params.date}.txt
 	
 	"""
 	
@@ -200,7 +216,7 @@ process MULTI_VCF_STATS {
 	container 'bcftools container'
 	
 	input:
-	tuple path(vcf), val(species), val(pop), val(prep)
+	tuple path(vcf), val(species), val(prep)
 	
 	output:
 	path "*.stats"
@@ -212,8 +228,40 @@ process MULTI_VCF_STATS {
 	-F ${params.reference} \
 	-s - ${vcf} > ${vcf}.stats
 	
+	touch vcf_filter_settings_!{params.date}.txt
+	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> vcf_filter_settings_!{params.date}.txt
+	echo "Minimum samples: ${minInd}" >> vcf_filter_settings_!{params.date}.txt
+	echo "Minimum variant quality score: !{params.min_quality}" >> vcf_filter_settings_!{params.date}.txt
+	echo "Minimum Depth: !{params.min_depth}" >> vcf_filter_settings_!{params.date}.txt
+	echo "Maximum Depth: !{params.max_depth}" >> vcf_filter_settings_!{params.date}.txt
+	
 	"""
 	
+}
+
+
+process MAKE_POP_MAP {
+	
+	input:
+	path pop_map
+	
+	output:
+	path "*.txt"
+	
+	script:
+	species=pop_map.readLines()[0][0..3]
+	// species=pop_map.withReader { it.readLine()?.substring(0, 3) }
+	if ( params.whole_species_mode == true ){
+		"""
+		# take first two columns of pop map
+		cut -f 1,2 -d'\t' ${pop_map} > ${species}_pop_map.txt
+		"""
+	} else {
+		"""
+		# take first and third columns of pop map
+		cut -f 1,3 ${pop_map} -d'\t' > ${species}_pop_map.txt
+		"""
+	}
 }
 
 
@@ -222,20 +270,23 @@ process SFS_ESTIMATION {
 	publishDir params.sfs_results, mode: 'copy', overwrite: true
 	
 	input:
-	tuple path(snps), val(species), val(pop), val(prep)
-	path pop_map
+	tuple path(snps), val(species), val(prep)
+	each path(pop_map)
 	
 	output:
-	tuple path("*.sfs"), val(species), val(pop), val(prep), emit: sfs
+	tuple path("*.sfs"), val(species), val(prep), emit: sfs
 	path "vcf_filter_settings_*.txt", emit: vcf_filters
+	
+	when: 
+	pop_map.getBaseName().substring(0,3) == species
 	
 	shell:
 	'''
 	
-	sample_size=`bcftools query command to count samples in a merged vcf`
+	sample_size=`bcftools query -l ${snps} | wc -l`
 	minInd="$((${sample_size} - !{params.max_snp_missingness}))"
 	
-	/absolute/path/to/easySFS/in/docker/container/easySFS.py -avf \
+	easySFS.py -avf \
 	-i !{snps} \
 	-p !{pop_map} \
 	-o . \
@@ -260,7 +311,7 @@ process VISUALIZE_SFS {
 	publishDir params.sfs_results, mode: 'copy', overwrite: true
 	
 	input:
-	tuple path(sfs), val(species), val(pop), val(prep)
+	tuple path(sfs), val(species), val(prep)
 	
 	output:
 	path "*.pdf"
@@ -273,8 +324,10 @@ process VISUALIZE_SFS {
 
 process BUILD_STAIRWAY_PLOT_SCRIPT {
 	
+	tag "${prep} ${species}"
+	
 	input:
-	tuple path(sfs), val(species), val(pop), val(prep)
+	tuple path(sfs), val(species), val(prep)
 	val sample_size
 	
 	output:
@@ -286,8 +339,6 @@ process BUILD_STAIRWAY_PLOT_SCRIPT {
 	script:
 	"""
 	
-	java -cp path/to/stairway_plot/files/stairway_plot_es Stairbuilder *.blueprint
-	
 	create_stairwayplot_script.R ${sfs} \
 	${species} \
 	${pop} \
@@ -298,7 +349,9 @@ process BUILD_STAIRWAY_PLOT_SCRIPT {
 	${params.mutation_rate} \
 	${params.random_seed} \
 	${params.whether_folded} \
-	/absolute/docker/container/path/to/stairway_plot/files/stairway_plot_es
+	/usr/local/bin/easysfs/stairway_plot/files/stairway_plot_es
+	
+	java -cp /usr/local/bin/easysfs/files/stairway_plot_es Stairbuilder *.blueprint
 	
 	"""
 	
@@ -324,12 +377,13 @@ process STAIRWAY_PLOT {
 
 process POP_STRUCTURE_PCA {
 	
-	container 'plink container'
+	publishDir params.params.pca_results, mode: 'copy'
 	
 	input:
-	tuple path(snps), val(species), val(pop), val(prep)
+	tuple path(snps), val(species), val(prep)
 	
 	output:
+	path "*.pdf"
 	
 	when:
 	params.principal_component_analysis == true
@@ -339,11 +393,13 @@ process POP_STRUCTURE_PCA {
 	
 	plink --vcf ${snps} --double-id --allow-extra-chr \
 	--set-missing-var-ids @:#\$1,\$2 \
-	--indep-pairwise 50 10 0.1 --out ${species}_${pop}_${prep}_${params.date}
+	--indep-pairwise 50 10 0.1 --out ${species}_${prep}_${params.date}
 	
 	plink --vcf ${snps} --double-id --allow-extra-chr --set-missing-var-ids @:#\$1,\$2 \
-	--extract ${species}_${pop}_${prep}_${params.date}.prune.in \
-	--make-bed --pca --out ${species}_${pop}_${prep}_${params.date}
+	--extract ${species}_${prep}_${params.date}.prune.in \
+	--make-bed --pca --out ${species}_${prep}_${params.date}
+	
+	plot_PCA.R
 	
 	"""
 	
@@ -352,7 +408,7 @@ process POP_STRUCTURE_PCA {
 process ADMIXTURE_PLOT {
 	
 	input:
-	tuple path(snps), val(species), val(pop), val(prep)
+	tuple path(snps), val(species), val(prep)
 	
 	output:
 	path "*."
@@ -361,7 +417,7 @@ process ADMIXTURE_PLOT {
 	params.admixture_plot == true
 	
 	script:
-	output_prefix = species "_" pop "_" + prep + "_admix"
+	output_prefix = species "_" + prep + "_admix"
 	"""
 	# Create a temporary plink file for ADMIXTURE
 	plink --vcf ${snps} --recode --allow-extra-chr --out ${output_prefix}
@@ -370,8 +426,8 @@ process ADMIXTURE_PLOT {
 	admixture --cv ${output_prefix}.ped \
 	${params.admixture_plot_K} | tee ${output_prefix}.log
 	
-	# Plot ADMIXTURE results using the R script provided with ADMIXTURE
-	Rscript plot_admixture.R ${output_prefix} ${params.admixture_plot_K}
+	# Plot ADMIXTURE results
+	plot_admixture.R ${output_prefix} ${params.admixture_plot_K}
 	"""
 }
 

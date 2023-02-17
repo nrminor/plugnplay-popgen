@@ -20,16 +20,12 @@ RUN apt-get update && apt-get install -y \
 RUN Rscript -e 'install.packages("tidyverse")'
 
 # Install necessary packages with conda
-RUN conda install -y \
+RUN conda install -y -c conda-forge -c anaconda -c bioconda \
 	numpy \
 	pandas \
 	scipy \
+	plink \
 	&& conda clean -ya
-
-# Install Plink
-RUN wget http://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20211016.zip -O /tmp/plink.zip && \
-	unzip /tmp/plink.zip -d /usr/local/bin && \
-	rm /tmp/plink.zip
 
 # Install ANGSD
 RUN wget https://github.com/ANGSD/angsd/archive/0.933.tar.gz -O /tmp/angsd.tar.gz && \
