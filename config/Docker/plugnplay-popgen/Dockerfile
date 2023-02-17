@@ -56,16 +56,14 @@ RUN wget https://github.com/dipetkov/eems/archive/master.tar.gz -O /tmp/eems.tar
 	rm /tmp/eems.tar.gz
 
 # Install stairway-plot-v2
-RUN wget https://sites.google.com/site/jpopgen/stairway-plot/stairway_plot_v2_0.zip?attredirects=0 -O /tmp/stairway.zip && \
+RUN wget https://github.com/xiaoming-liu/stairway-plot-v2/blob/master/stairway_plot_v2.1.1.zip?raw=true -O /tmp/stairway.zip && \
 	unzip /tmp/stairway.zip -d /usr/local/bin && \
 	chmod +x /usr/local/bin/stairway_plot_v2 && \
 	rm /tmp/stairway.zip
 
 # Install easySFS
-RUN wget https://github.com/isaacovercast/easySFS/archive/master.tar.gz -O /tmp/easysfs.tar.gz && \
-	tar xvf /tmp/easysfs.tar.gz -C /usr/local/bin && \
-	mv /usr/local/bin/easySFS-master /usr/local/bin/easysfs && \
-	rm /tmp/easysfs.tar.gz
+RUN git clone https://github.com/isaacovercast/easySFS.git -O /usr/local/bin/easysfs && \
+	chmod 777 /usr/local/bin/easysfs/easySFS.py
 
 # Set up the working directory
 WORKDIR /app
