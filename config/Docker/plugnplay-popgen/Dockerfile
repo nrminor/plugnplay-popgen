@@ -45,7 +45,7 @@ RUN wget https://dalexander.github.io/admixture/binaries/admixture_linux-1.3.0.t
 	rm /tmp/admixture.tar.gz
 
 # Install STRUCTURE
-RUN wget https://web.stanford.edu/group/pritchardlab/structure_software/release_versions/v2.3.4/structure_linux_console.tar.gz -O /tmp/structure.tar.gz && \
+RUN wget https://web.stanford.edu/group/pritchardlab/structure_software/release_versions/v2.3.4/release/structure_linux_console.tar.gz -O /tmp/structure.tar.gz && \
 	tar xvf /tmp/structure.tar.gz -C /usr/local/bin && \
 	rm /tmp/structure.tar.gz
 
