@@ -57,8 +57,7 @@ RUN wget https://github.com/dipetkov/eems/archive/master.tar.gz -O /tmp/eems.tar
 
 # Install stairway-plot-v2
 RUN wget https://github.com/xiaoming-liu/stairway-plot-v2/blob/master/stairway_plot_v2.1.1.zip?raw=true -O /tmp/stairway.zip && \
-	unzip /tmp/stairway.zip -d /usr/local/bin && \
-	chmod +x /usr/local/bin/stairway_plot_v2 && \
+	unzip /tmp/stairway.zip -d /usr/local/bin/stairway_plot_v2.1.1 && \
 	rm /tmp/stairway.zip
 
 # Install easySFS
