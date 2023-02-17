@@ -59,7 +59,7 @@ RUN wget https://github.com/dipetkov/eems/archive/master.tar.gz -O /tmp/eems.tar
 RUN wget https://github.com/xiaoming-liu/stairway-plot-v2/blob/master/stairway_plot_v2.1.1.zip?raw=true /tmp && \
 	mv /tmp/stairway_plot_v2.1.1.zip?raw=true /tmp/stairway.zip && \ 
 	unzip /tmp/stairway.zip -d /usr/local/bin/stairway_plot_v2.1.1 && \
-	rm /tmp/stairway.zip
+	rm -rf /tmp
 
 # Install easySFS
 RUN git clone https://github.com/isaacovercast/easySFS.git -O /usr/local/bin/easysfs && \
