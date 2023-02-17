@@ -61,7 +61,7 @@ RUN wget https://github.com/xiaoming-liu/stairway-plot-v2/raw/master/stairway_pl
 	rm stairway_plot_v2.1.1.zip
 
 # Install easySFS
-RUN git clone https://github.com/isaacovercast/easySFS.git -O /usr/local/bin/easysfs && \
+RUN git clone https://github.com/isaacovercast/easySFS.git /usr/local/bin/easysfs && \
 	chmod 777 /usr/local/bin/easysfs/easySFS.py
 
 # Set up the working directory
