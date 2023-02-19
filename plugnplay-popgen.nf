@@ -14,7 +14,7 @@ workflow {
 	ch_vcfs = Channel
 		.fromPath ( params.samplesheet )
 		.splitCsv ( header: true )
-		.map { row -> tuple( row.sample_id, row.species, row.population, row.prep_type, row.platform, path(raw_vcf) ) }
+		.map { row -> tuple( row.sample_id, row.species, row.population, row.prep_type, row.platform, file(row.raw_vcf) ) }
 	
 	ch_reference = Channel
 		.fromPath ( params.reference )
@@ -24,58 +24,53 @@ workflow {
 		ch_vcfs
 	)
 	
-	SINGLE_VCF_STATS (
-		SNP_FILTERING.out
-	)
+	// SINGLE_VCF_STATS (
+	// 	SNP_FILTERING.out.vcf
+	// )
 	
 	MERGE_VCFS (
 		SNP_FILTERING.out.vcf
-			.filter { it[3] == "WGS" }
-			.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, species, prep_type }
-			.groupTuple( by: 1 )
-			.mix (
-				SNP_FILTERING.out.vcf
-				.filter { it[3] == "RAD" }
-				.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, species, prep_type }
-				.groupTuple( by: 1 )
-			)
+			.map { sample_id, species, population, prep_type, platform, raw_vcf -> tuple( file(raw_vcf), species, prep_type ) }
+			.filter { !file(it[0]).isEmpty() }
+			.groupTuple( by: [1,2] ),
+		SNP_FILTERING.out.index.collect()
 	)
 	
-	MULTI_VCF_STATS (
-		MERGE_VCFS.out
-	)
+	// MULTI_VCF_STATS (
+	// 	MERGE_VCFS.out
+	// )
 	
-	MAKE_POP_MAP (
-		ch_vcfs
-			.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, species, population }
-			.groupTuple( by: 1 )
-			.collectFile( name: "pop_map.txt", newLine: true )
-	)
+	// MAKE_POP_MAP (
+	// 	ch_vcfs
+	// 		.map { sample_id, species, population, prep_type, platform, raw_vcf -> tuple( sample_id, species, population ) }
+	// 		.groupTuple( by: 1 )
+	// 		.collectFile( name: "pop_map.txt", newLine: true )
+	// )
 	
-	SFS_ESTIMATION (
-		MERGE_VCFS.out,
-		MAKE_POP_MAP.out
-	)
+	// SFS_ESTIMATION (
+	// 	MERGE_VCFS.out,
+	// 	MAKE_POP_MAP.out
+	// )
 	
-	VISUALIZE_SFS (
-		SFS_ESTIMATION.out.sfs
-	)
+	// VISUALIZE_SFS (
+	// 	SFS_ESTIMATION.out.sfs
+	// )
 	
-	BUILD_STAIRWAY_PLOT_SCRIPT (
-		SFS_ESTIMATION.out.sfs,
-		ch_vcfs
-			.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, species }
-			.groupTuple( by: 1 )
-			.countBy { it[0] }
-	)
+	// BUILD_STAIRWAY_PLOT_SCRIPT (
+	// 	SFS_ESTIMATION.out.sfs,
+	// 	ch_vcfs
+	// 		.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, species }
+	// 		.groupTuple( by: 1 )
+	// 		.countBy { it[0] }
+	// )
 	
-	STAIRWAY_PLOT ( 
-		BUILD_STAIRWAY_PLOT_SCRIPT.out
-	)
+	// STAIRWAY_PLOT ( 
+	// 	BUILD_STAIRWAY_PLOT_SCRIPT.out
+	// )
 	
-	POP_STRUCTURE_PCA ( )
-	
-	ADMIXTURE_PLOT ( )
+	// POP_STRUCTURE_PCA ( )
+	// 
+	// ADMIXTURE_PLOT ( )
 
 }
 // --------------------------------------------------------------- //
@@ -87,9 +82,9 @@ workflow {
 // --------------------------------------------------------------- //
 
 // working with single nucleotide polymorphisms
-params.snp_results = params.results + "/" + "4_per_sample_SNPs"
+params.snp_results = params.results + "/" + "per_sample_SNPs"
 params.single_sample_snp_stats = params.snp_results + "/" + "snp_stats"
-params.merged_snps = params.results + "/" + "5_per_species_SNPs"
+params.merged_snps = params.results + "/" + "per_species_SNPs"
 params.multisample_snp_stats = params.merged_snps + "/" + "snp_stats"
 
 // Additional, optional analyses
@@ -98,7 +93,7 @@ params.sfs_results = params.analyses + "/" + "site_frequency_spectra"
 params.angsd_results = params.analyses + "/" + "ANGSD_outputs"
 params.angsd_sfs_plots = params.angsd_results + "/" + "SFS_plots"
 params.stairway_plots = params.analyses + "/" + "Stairway_plots"
-params.stairway_plot_run_date = params.analyses + "/" + "Stairway_plots" + "/" + ${params.date}
+params.stairway_plot_run_date = params.analyses + "/" + "Stairway_plots" + "/" + params.date
 params.admixture_results = params.analyses + "/" + "admixture_plots"
 params.pca_results = params.analyses + "/" + "PCA_plots"
 
@@ -117,16 +112,14 @@ process SNP_FILTERING {
 	publishDir params.snp_results, pattern: "*.vcf.gz", mode: 'copy'
 	publishDir params.snp_results, pattern: "*.tbi", mode: 'copy'
 	
-	container 'docker://quay.io/biocontainers/vcftools:0.1.16--he513fc3_4'
-	
 	cpus 2
 	
 	input:
-	tuple val(sample), val(pop), val(prep), val(platform), path(vcf)
+	tuple val(sample), val(species), val(pop), val(prep), val(platform), path(vcf)
 	
 	output:
 	tuple val(sample), val(species), val(pop), val(prep), val(platform), path("*_filtered.vcf.gz"), emit: vcf
-	path("*.tbi"), emit: index
+	path "*.tbi", emit: index
 	
 	script:
 	"""
@@ -152,20 +145,18 @@ process SINGLE_VCF_STATS {
 	
 	publishDir params.single_sample_snp_stats, mode: 'copy'
 	
-	container 'bcftools container'
-	
 	input:
-	path vcf
+	tuple val(sample), val(species), val(pop), val(prep), val(platform), path(filtered_vcf)
 	
 	output:
 	path "*.stats"
 	
 	script:
 	"""
-	
+	bgzip -d -c ${filtered_vcf} > ${sample}_${prep}_filtered.vcf && \
 	bcftools stats \
 	-F ${params.reference} \
-	-s - ${vcf} > ${vcf}.stats
+	-s - ${filtered_vcf} > ${filtered_vcf}.stats
 	
 	"""
 	
@@ -174,28 +165,31 @@ process SINGLE_VCF_STATS {
 
 process MERGE_VCFS {
 	
-	publishDir params.merged_snps, mode: 'copy'
+	tag "${prep} ${species}"
 	
-	container 'docker://quay.io/biocontainers/bcftools:1.12--h3f113a9_0'
+	publishDir params.merged_snps, mode: 'copy'
 	
 	cpus 8
 	
 	input:
-	tuple tuple(vcf_files), val(species), val(prep)
-	tuple tuple()
+	tuple path(vcf_files), val(species), val(prep)
+	path index_files
 	
 	output:
-	tuple path("*${species}*.vcf.gz"), val(species), val(prep)
+	tuple path("*.vcf.gz"), val(species), val(prep)
 	
-	script:
-	"""
+	shell:
+	'''
+	
+	sample_size=`ls -1 *!{species}*.vcf.gz | wc -l`
+	minInd="$((${sample_size} - !{params.max_snp_missingness}))"
 	
 	bcftools merge \
 	--merge snps \
 	--output-type z \
-	--threads ${task.cpus} \
-	--output ${species}_multisample_${prep}.vcf.gz
-	*${species}*.vcf.gz
+	--threads !{task.cpus} \
+	--output "!{species}_multisample_!{prep}.vcf.gz" \
+	*!{species}*.vcf.gz
 	
 	touch vcf_filter_settings_!{params.date}.txt
 	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> vcf_filter_settings_!{params.date}.txt
@@ -204,7 +198,7 @@ process MERGE_VCFS {
 	echo "Minimum Depth: !{params.min_depth}" >> vcf_filter_settings_!{params.date}.txt
 	echo "Maximum Depth: !{params.max_depth}" >> vcf_filter_settings_!{params.date}.txt
 	
-	"""
+	'''
 	
 }
 
@@ -213,16 +207,17 @@ process MULTI_VCF_STATS {
 	
 	publishDir params.multisample_snp_stats, mode: 'copy'
 	
-	container 'bcftools container'
-	
 	input:
 	tuple path(vcf), val(species), val(prep)
 	
 	output:
 	path "*.stats"
 	
-	script:
-	"""
+	shell:
+	'''
+	
+	sample_size=`bcftools query -l ${vcf} | wc -l`
+	minInd="$((${sample_size} - !{params.max_snp_missingness}))"
 	
 	bcftools stats \
 	-F ${params.reference} \
@@ -235,7 +230,7 @@ process MULTI_VCF_STATS {
 	echo "Minimum Depth: !{params.min_depth}" >> vcf_filter_settings_!{params.date}.txt
 	echo "Maximum Depth: !{params.max_depth}" >> vcf_filter_settings_!{params.date}.txt
 	
-	"""
+	'''
 	
 }
 
@@ -286,7 +281,7 @@ process SFS_ESTIMATION {
 	sample_size=`bcftools query -l ${snps} | wc -l`
 	minInd="$((${sample_size} - !{params.max_snp_missingness}))"
 	
-	easySFS.py -avf \
+	/usr/local/bin/easysfs/easySFS.py -avf \
 	-i !{snps} \
 	-p !{pop_map} \
 	-o . \
@@ -349,9 +344,9 @@ process BUILD_STAIRWAY_PLOT_SCRIPT {
 	${params.mutation_rate} \
 	${params.random_seed} \
 	${params.whether_folded} \
-	/usr/local/bin/easysfs/stairway_plot/files/stairway_plot_es
+	/usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/files/stairway_plot_es
 	
-	java -cp /usr/local/bin/easysfs/files/stairway_plot_es Stairbuilder *.blueprint
+	java -cp usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/stairway_plot_es Stairbuilder *.blueprint
 	
 	"""
 	

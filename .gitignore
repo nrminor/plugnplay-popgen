@@ -1,5 +1,6 @@
 work/
 results/
+results*/
 .nextflow/
 
 resources/*.fna
@@ -8,3 +9,4 @@ resources/*.fa
 .nextflow.log*
 report.html*
 trace.txt*
+*.dot
