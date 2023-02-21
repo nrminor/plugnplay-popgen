@@ -31,24 +31,24 @@ workflow {
 	MERGE_VCFS (
 		SNP_FILTERING.out.vcf
 			.map { sample_id, species, population, prep_type, platform, raw_vcf -> tuple( file(raw_vcf), species, prep_type ) }
-			.filter { !file(it[0]).isEmpty() }
+			.filter { file(it[0]).countLines() > 0 }
 			.groupTuple( by: [1,2] ),
 		SNP_FILTERING.out.index.collect()
 	)
 	
 	// MULTI_VCF_STATS (
-	// 	MERGE_VCFS.out
+	// 	MERGE_VCFS.out.vcf
 	// )
 	
-	// MAKE_POP_MAP (
-	// 	ch_vcfs
-	// 		.map { sample_id, species, population, prep_type, platform, raw_vcf -> tuple( sample_id, species, population ) }
-	// 		.groupTuple( by: 1 )
-	// 		.collectFile( name: "pop_map.txt", newLine: true )
-	// )
+	MAKE_POP_MAP (
+		ch_vcfs
+			.map { sample_id, species, population, prep_type, platform, raw_vcf -> "${sample_id}, ${species}, ${population}" ) }
+			.collect()
+			.collectFile( name: "pop_map.txt", newLine: true )
+	)
 	
 	// SFS_ESTIMATION (
-	// 	MERGE_VCFS.out,
+	// 	MERGE_VCFS.out.vcf,
 	// 	MAKE_POP_MAP.out
 	// )
 	
@@ -176,7 +176,8 @@ process MERGE_VCFS {
 	path index_files
 	
 	output:
-	tuple path("*.vcf.gz"), val(species), val(prep)
+	tuple path("*.vcf.gz"), val(species), val(prep), emit: vcf
+	path "*.txt"
 	
 	shell:
 	'''
@@ -191,12 +192,18 @@ process MERGE_VCFS {
 	--output "!{species}_multisample_!{prep}.vcf.gz" \
 	*!{species}*.vcf.gz
 	
-	touch vcf_filter_settings_!{params.date}.txt
-	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Minimum samples: ${minInd}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Minimum variant quality score: !{params.min_quality}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Minimum Depth: !{params.min_depth}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Maximum Depth: !{params.max_depth}" >> vcf_filter_settings_!{params.date}.txt
+	sample_ids=`bcftools query -l "!{species}_multisample_!{prep}.vcf.gz"`
+	
+	touch !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "VCF FILTER SETTINGS APPLIED TO !{prep} !{species} SNPS" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "----------------------------------------------------------" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum samples: ${minInd} / ${sample_size}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum variant quality score: !{params.min_quality}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum Depth: !{params.min_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Maximum Depth: !{params.max_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Sample IDs included: ${sample_ids}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
 	
 	'''
 	
@@ -244,17 +251,17 @@ process MAKE_POP_MAP {
 	path "*.txt"
 	
 	script:
-	species=pop_map.readLines()[0][0..3]
+	// species=pop_map.readLines()[0][0..3]
 	// species=pop_map.withReader { it.readLine()?.substring(0, 3) }
 	if ( params.whole_species_mode == true ){
 		"""
 		# take first two columns of pop map
-		cut -f 1,2 -d'\t' ${pop_map} > ${species}_pop_map.txt
+		cut -f 1,2 -d'\t' ${pop_map} > tmp_pop_map.txt
 		"""
 	} else {
 		"""
 		# take first and third columns of pop map
-		cut -f 1,3 ${pop_map} -d'\t' > ${species}_pop_map.txt
+		cut -f 1,2 -d'\t' ${pop_map} > tmp_pop_map.txt
 		"""
 	}
 }
@@ -266,7 +273,7 @@ process SFS_ESTIMATION {
 	
 	input:
 	tuple path(snps), val(species), val(prep)
-	each path(pop_map)
+	path pop_map
 	
 	output:
 	tuple path("*.sfs"), val(species), val(prep), emit: sfs
