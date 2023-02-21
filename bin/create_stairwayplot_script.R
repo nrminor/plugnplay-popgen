@@ -3,11 +3,13 @@ args = commandArgs(trailingOnly=TRUE)
 
 # defining the relevant input parameters based on what was specified in
 # nextflow.config, or in the command line of the workflow run
-sfs <- read.delim(args[1], header = F)
+sfs <- scan(args[1], skip =1, sep = " ")
 species <- as.character(args[2])
 pop <- as.character(args[3])
 prep <- as.character(args[4])
 sample_size <- as.numeric(args[5])
+sfs <- sfs[1:round(sample_size/2)]
+sfs <- paste(sfs, collapse = ", ")
 genome_length <- as.numeric(args[6])
 year_per_generation <- as.numeric(args[7])
 mutation_rate <- as.character(args[8])
@@ -17,7 +19,7 @@ path_to_stairway_plot <- as.character(args[11])
 
 # creating a dataframe that will be filled out into the Stairway plot blueprint
 # file
-blueprint <- as.data.frame("blueprint_file" = "# blueprint file")
+blueprint <- data.frame("blueprint_file" = "# blueprint file")
 
 # Adding population ID line
 blueprint <- rbind(blueprint, paste("popid: ", species, "_", 
@@ -26,7 +28,7 @@ blueprint <- rbind(blueprint, paste("popid: ", species, "_",
 # Adding sample size line
 blueprint <- rbind(blueprint, paste("nseq: ", sample_size, sep = ""))
 
-# Adding sample size line
+# Adding SFS line
 blueprint <- rbind(blueprint, paste("SFS: ", sfs, sep = ""))
 
 # Adding smallest SFS bin to be used
@@ -44,33 +46,33 @@ blueprint <- rbind(blueprint, paste("pct_training: ", 0.67, sep = ""))
 
 # Adding breakpoints
 blueprint <- rbind(blueprint,
-				   "nrand:",
+				   paste("nrand:",
 				   round(sample_size -(2*7)), round(sample_size - (2*5)),
-				   round(sample_size - (2*3), round(sample_size - 2),
+				   round(sample_size - (2*3)), round(sample_size - 2),
 						 sep = " "))
 
 # Adding input directory
-blueprint <- rbind(blueprint, "project_dir: ", getwd(), sep = ""))
+blueprint <- rbind(blueprint, paste("project_dir: ", getwd(), sep = ""))
 
 # Adding Stairway plot software directory
-blueprint <- rbind(blueprint, "stairway_plot_dir: ", 
+blueprint <- rbind(blueprint, paste("stairway_plot_dir: ", 
 				   path_to_stairway_plot, sep = ""))
 
 # Adding number of input files for estimation line
-blueprint <- rbind(blueprint, "ninput: 200", sep = ""))
+blueprint <- rbind(blueprint, paste("ninput: 200", sep = ""))
 
 # Adding random seed line
-blueprint <- rbind(blueprint, "ninput: ", random_seed, sep = ""))
+blueprint <- rbind(blueprint, paste("ninput: ", random_seed, sep = ""))
 
 # Adding mutation rate line
-blueprint <- rbind(blueprint, "mu: ", mutation_rate, sep = ""))
+blueprint <- rbind(blueprint, paste("mu: ", mutation_rate, sep = ""))
 
 # Adding year(s) per generation line
-blueprint <- rbind(blueprint, "year_per_generation: ", 
+blueprint <- rbind(blueprint, paste("year_per_generation: ", 
 				   year_per_generation, sep = ""))
 
 # Adding plot title line
-blueprint <- rbind(blueprint, "plot_title: ", 
+blueprint <- rbind(blueprint, paste("plot_title: ", 
 				   species, "_", prep, "_", pop, sep = ""))
 
 # Adding default settings for x- and y-axis limits
@@ -80,15 +82,15 @@ blueprint <- rbind(blueprint, "xspacing: 2", sep = "")
 blueprint <- rbind(blueprint, "yspacing: 2", sep = "")
 
 # Adding fontsize (12 pt) line
-blueprint <- rbind(blueprint, "fontsize: 12", sep = "")
+blueprint <- rbind(blueprint, "fontsize: 12")
 
 # naming Stairway plot blueprint file and exporting it
 write.table(blueprint, 
 			paste(species, "_", pop, "_", prep, ".blueprint", sep = ""),
-			append = FALSE, quote = FALSE, sep = "\t"
+			append = FALSE, quote = FALSE, sep = "\t",
 			col.names = FALSE, row.names = FALSE)
 
 # Command to construct stairway plot BASH script
-command <- paste("java -cp", path_to_stairway_plot, ,
-				 sep = " ")
-system(command)
+# command <- paste("java -cp", path_to_stairway_plot, ,
+# 				 sep = " ")
+# system(command)

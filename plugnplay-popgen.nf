@@ -42,27 +42,23 @@ workflow {
 	
 	MAKE_POP_MAP (
 		ch_vcfs
-			.map { sample_id, species, population, prep_type, platform, raw_vcf -> "${sample_id}, ${species}, ${population}" ) }
+			.map { sample_id, species, population, prep_type, platform, raw_vcf -> "${sample_id}, ${species}, ${population}" }
 			.collect()
 			.collectFile( name: "pop_map.txt", newLine: true )
 	)
 	
-	// SFS_ESTIMATION (
-	// 	MERGE_VCFS.out.vcf,
-	// 	MAKE_POP_MAP.out
-	// )
+	SFS_ESTIMATION (
+		MERGE_VCFS.out.vcf,
+		MAKE_POP_MAP.out
+	)
 	
-	// VISUALIZE_SFS (
-	// 	SFS_ESTIMATION.out.sfs
-	// )
+	VISUALIZE_SFS (
+		SFS_ESTIMATION.out.sfs
+	)
 	
-	// BUILD_STAIRWAY_PLOT_SCRIPT (
-	// 	SFS_ESTIMATION.out.sfs,
-	// 	ch_vcfs
-	// 		.map { sample_id, species, population, prep_type, platform, raw_vcf -> sample_id, species }
-	// 		.groupTuple( by: 1 )
-	// 		.countBy { it[0] }
-	// )
+	BUILD_STAIRWAY_PLOT_SCRIPT (
+		SFS_ESTIMATION.out.sfs
+	)
 	
 	// STAIRWAY_PLOT ( 
 	// 	BUILD_STAIRWAY_PLOT_SCRIPT.out
@@ -153,6 +149,7 @@ process SINGLE_VCF_STATS {
 	
 	script:
 	"""
+	
 	bgzip -d -c ${filtered_vcf} > ${sample}_${prep}_filtered.vcf && \
 	bcftools stats \
 	-F ${params.reference} \
@@ -176,23 +173,22 @@ process MERGE_VCFS {
 	path index_files
 	
 	output:
-	tuple path("*.vcf.gz"), val(species), val(prep), emit: vcf
+	tuple path("*.vcf.gz"), val(species), val(prep), env(sample_size), emit: vcf
 	path "*.txt"
 	
 	shell:
 	'''
 	
-	sample_size=`ls -1 *!{species}*.vcf.gz | wc -l`
-	minInd="$((${sample_size} - !{params.max_snp_missingness}))"
-	
 	bcftools merge \
 	--merge snps \
 	--output-type z \
 	--threads !{task.cpus} \
-	--output "!{species}_multisample_!{prep}.vcf.gz" \
+	--output !{species}_multisample_!{prep}.vcf.gz \
 	*!{species}*.vcf.gz
 	
-	sample_ids=`bcftools query -l "!{species}_multisample_!{prep}.vcf.gz"`
+	sample_ids=`bcftools query -l !{species}_multisample_!{prep}.vcf.gz`
+	sample_size=`bcftools query -l !{species}_multisample_!{prep}.vcf.gz | wc -l`
+	minInd="$((${sample_size} - !{params.max_snp_missingness}))"
 	
 	touch !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
 	echo "VCF FILTER SETTINGS APPLIED TO !{prep} !{species} SNPS" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
@@ -215,7 +211,7 @@ process MULTI_VCF_STATS {
 	publishDir params.multisample_snp_stats, mode: 'copy'
 	
 	input:
-	tuple path(vcf), val(species), val(prep)
+	tuple path(vcf), val(species), val(prep), val(sample_size)
 	
 	output:
 	path "*.stats"
@@ -223,19 +219,23 @@ process MULTI_VCF_STATS {
 	shell:
 	'''
 	
-	sample_size=`bcftools query -l ${vcf} | wc -l`
+	sample_ids=`bcftools query -l !{vcf}`
 	minInd="$((${sample_size} - !{params.max_snp_missingness}))"
 	
 	bcftools stats \
 	-F ${params.reference} \
 	-s - ${vcf} > ${vcf}.stats
 	
-	touch vcf_filter_settings_!{params.date}.txt
-	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Minimum samples: ${minInd}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Minimum variant quality score: !{params.min_quality}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Minimum Depth: !{params.min_depth}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Maximum Depth: !{params.max_depth}" >> vcf_filter_settings_!{params.date}.txt
+	touch !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "VCF FILTER SETTINGS APPLIED TO !{prep} !{species} SNPS" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "----------------------------------------------------------" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum samples: ${minInd} / !{sample_size}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum variant quality score: !{params.min_quality}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum Depth: !{params.min_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Maximum Depth: !{params.max_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Sample IDs included: ${sample_ids}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
 	
 	'''
 	
@@ -251,17 +251,27 @@ process MAKE_POP_MAP {
 	path "*.txt"
 	
 	script:
-	// species=pop_map.readLines()[0][0..3]
-	// species=pop_map.withReader { it.readLine()?.substring(0, 3) }
 	if ( params.whole_species_mode == true ){
 		"""
 		# take first two columns of pop map
-		cut -f 1,2 -d'\t' ${pop_map} > tmp_pop_map.txt
+		cut -d',' -f2 ${pop_map} | sort | uniq > species.txt
+		cut -f 1,2 -d',' ${pop_map} > tmp_pop_map.txt
+		for i in `cat species.txt`;
+		do
+			grep -w \$i tmp_pop_map.txt > \${i}_pop_map.txt
+		done
+		rm tmp_pop_map.txt
 		"""
 	} else {
 		"""
 		# take first and third columns of pop map
-		cut -f 1,2 -d'\t' ${pop_map} > tmp_pop_map.txt
+		cut -d',' -f2 ${pop_map} | sort | uniq > species.txt
+		cut -f 1,2 -d',' ${pop_map} > tmp_pop_map.txt
+		for i in `cat species.txt`;
+		do
+			grep -w \$i tmp_pop_map.txt > \${i}_pop_map.txt
+		done
+		rm tmp_pop_map.txt
 		"""
 	}
 }
@@ -269,40 +279,43 @@ process MAKE_POP_MAP {
 
 process SFS_ESTIMATION {
 	
+	tag "${prep} ${species}"
+	
 	publishDir params.sfs_results, mode: 'copy', overwrite: true
 	
 	input:
-	tuple path(snps), val(species), val(prep)
-	path pop_map
+	tuple path(snps), val(species), val(prep), val(sample_size)
+	each path(pop_maps)
 	
 	output:
-	tuple path("*.sfs"), val(species), val(prep), emit: sfs
-	path "vcf_filter_settings_*.txt", emit: vcf_filters
-	
-	when: 
-	pop_map.getBaseName().substring(0,3) == species
+	tuple path("*.sfs"), val(species), val(prep), val(sample_size), emit: sfs
+	path "*_vcf_filter_settings_*.txt", emit: vcf_filters
 	
 	shell:
 	'''
 	
-	sample_size=`bcftools query -l ${snps} | wc -l`
-	minInd="$((${sample_size} - !{params.max_snp_missingness}))"
+	sample_ids=`bcftools query -l !{snps}`
+	minInd="$((!{sample_size} - !{params.max_snp_missingness}))"
 	
 	/usr/local/bin/easysfs/easySFS.py -avf \
 	-i !{snps} \
-	-p !{pop_map} \
+	-p !{species}_pop_map.txt \
 	-o . \
 	-f \
-	--proj ${sample_size}
+	--proj !{sample_size}
 	
 	mv dadi/!{species}.sfs ./!{species}_!{params.date}.sfs
 	
-	touch vcf_filter_settings_!{params.date}.txt
-	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Minimum samples: ${minInd}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Minimum variant quality score: !{params.min_quality}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Minimum Depth: !{params.min_depth}" >> vcf_filter_settings_!{params.date}.txt
-	echo "Maximum Depth: !{params.max_depth}" >> vcf_filter_settings_!{params.date}.txt
+	touch !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "VCF FILTER SETTINGS APPLIED TO !{prep} !{species} SNPS" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "----------------------------------------------------------" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum samples: ${minInd} / !{sample_size}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum variant quality score: !{params.min_quality}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum Depth: !{params.min_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Maximum Depth: !{params.max_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Sample IDs included: ${sample_ids}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
 	
 	'''
 }
@@ -310,17 +323,19 @@ process SFS_ESTIMATION {
 
 process VISUALIZE_SFS {
 	
+	tag "${prep} ${species}"
+	
 	publishDir params.sfs_results, mode: 'copy', overwrite: true
 	
 	input:
-	tuple path(sfs), val(species), val(prep)
+	tuple path(sfs), val(species), val(prep), val(sample_size)
 	
 	output:
 	path "*.pdf"
 	
 	script:
 	"""
-	SFS_plotting.R ${sfs} ${params.date}
+	SFS_plotting.R ${sfs} ${species} ${params.date}
 	"""
 }
 
@@ -329,8 +344,7 @@ process BUILD_STAIRWAY_PLOT_SCRIPT {
 	tag "${prep} ${species}"
 	
 	input:
-	tuple path(sfs), val(species), val(prep)
-	val sample_size
+	tuple path(sfs), val(species), val(prep), val(sample_size)
 	
 	output:
 	path "*.sh"
@@ -343,7 +357,7 @@ process BUILD_STAIRWAY_PLOT_SCRIPT {
 	
 	create_stairwayplot_script.R ${sfs} \
 	${species} \
-	${pop} \
+	${species} \
 	${prep} \
 	${sample_size} \
 	${params.genome_length} \
@@ -353,7 +367,7 @@ process BUILD_STAIRWAY_PLOT_SCRIPT {
 	${params.whether_folded} \
 	/usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/files/stairway_plot_es
 	
-	java -cp usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/stairway_plot_es Stairbuilder *.blueprint
+	java -cp /usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/stairway_plot_es Stairbuilder ${species}_${species}_${prep}.blueprint
 	
 	"""
 	
