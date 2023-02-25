@@ -76,10 +76,10 @@ blueprint <- rbind(blueprint, paste("plot_title: ",
 				   species, "_", prep, "_", pop, sep = ""))
 
 # Adding default settings for x- and y-axis limits
-blueprint <- rbind(blueprint, "xrange: 0,0", sep = "")
-blueprint <- rbind(blueprint, "yrange: 0,0", sep = "")
-blueprint <- rbind(blueprint, "xspacing: 2", sep = "")
-blueprint <- rbind(blueprint, "yspacing: 2", sep = "")
+blueprint <- rbind(blueprint, "xrange: 0,0")
+blueprint <- rbind(blueprint, "yrange: 0,0")
+blueprint <- rbind(blueprint, "xspacing: 2")
+blueprint <- rbind(blueprint, "yspacing: 2")
 
 # Adding fontsize (12 pt) line
 blueprint <- rbind(blueprint, "fontsize: 12")

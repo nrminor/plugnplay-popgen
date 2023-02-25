@@ -15,29 +15,32 @@ workflow {
 		.fromPath ( params.samplesheet )
 		.splitCsv ( header: true )
 		.map { row -> tuple( row.sample_id, row.species, row.population, row.prep_type, row.platform, file(row.raw_vcf) ) }
-	
-	ch_reference = Channel
-		.fromPath ( params.reference )
 
 	// Workflow steps
-	SNP_FILTERING (
+	SNP_QUAL_FILTERING (
 		ch_vcfs
 	)
 	
 	// SINGLE_VCF_STATS (
-	// 	SNP_FILTERING.out.vcf
+	// 	SNP_QUAL_FILTERING.out.vcf
 	// )
 	
 	MERGE_VCFS (
-		SNP_FILTERING.out.vcf
+		SNP_QUAL_FILTERING.out.vcf
 			.map { sample_id, species, population, prep_type, platform, raw_vcf -> tuple( file(raw_vcf), species, prep_type ) }
 			.filter { file(it[0]).countLines() > 0 }
 			.groupTuple( by: [1,2] ),
-		SNP_FILTERING.out.index.collect()
+		SNP_QUAL_FILTERING.out.index.collect()
 	)
 	
+	// Also consider using `.filter { file(it[0]).text().split("\n")[0] != "" }` for the above channel
+	
+	FILTER_SNPS_BY_SAMPLE_COUNT {
+		MERGE_VCFS.out.vcf
+	}
+	
 	// MULTI_VCF_STATS (
-	// 	MERGE_VCFS.out.vcf
+	// 	FILTER_SNPS_BY_SAMPLE_COUNT.out.vcf
 	// )
 	
 	MAKE_POP_MAP (
@@ -48,7 +51,7 @@ workflow {
 	)
 	
 	SFS_ESTIMATION (
-		MERGE_VCFS.out.vcf,
+		FILTER_SNPS_BY_SAMPLE_COUNT.out.vcf,
 		MAKE_POP_MAP.out
 	)
 	
@@ -78,13 +81,13 @@ workflow {
 // --------------------------------------------------------------- //
 
 // working with single nucleotide polymorphisms
-params.snp_results = params.results + "/" + "per_sample_SNPs"
+params.snp_results = params.results + "/" + "1_per_sample_SNPs"
 params.single_sample_snp_stats = params.snp_results + "/" + "snp_stats"
-params.merged_snps = params.results + "/" + "per_species_SNPs"
+params.merged_snps = params.results + "/" + "2_per_species_SNPs"
 params.multisample_snp_stats = params.merged_snps + "/" + "snp_stats"
 
 // Additional, optional analyses
-params.analyses = params.results + "/" + "analyses"
+params.analyses = params.results + "/" + "3_analyses"
 params.sfs_results = params.analyses + "/" + "site_frequency_spectra"
 params.angsd_results = params.analyses + "/" + "ANGSD_outputs"
 params.angsd_sfs_plots = params.angsd_results + "/" + "SFS_plots"
@@ -102,7 +105,7 @@ params.pca_results = params.analyses + "/" + "PCA_plots"
 // --------------------------------------------------------------- //
 
 
-process SNP_FILTERING {
+process SNP_QUAL_FILTERING {
 	
 	tag "${sample}"
 	publishDir params.snp_results, pattern: "*.vcf.gz", mode: 'copy'
@@ -114,7 +117,7 @@ process SNP_FILTERING {
 	tuple val(sample), val(species), val(pop), val(prep), val(platform), path(vcf)
 	
 	output:
-	tuple val(sample), val(species), val(pop), val(prep), val(platform), path("*_filtered.vcf.gz"), emit: vcf
+	tuple val(sample), val(species), val(pop), val(prep), val(platform), path("${sample}_${prep}_filtered.vcf.gz"), emit: vcf
 	path "*.tbi", emit: index
 	
 	script:
@@ -122,8 +125,6 @@ process SNP_FILTERING {
 	
 	vcftools --gzvcf ${vcf} \
 	--max-alleles 2 \
-	--mac ${params.minor_allele_count} \
-	--max-missing-count ${params.max_snp_missingness} \
 	--minQ ${params.min_quality} \
 	--minDP ${params.min_depth} \
 	--remove-indels \
@@ -137,40 +138,17 @@ process SNP_FILTERING {
 }
 
 
-process SINGLE_VCF_STATS {
-	
-	publishDir params.single_sample_snp_stats, mode: 'copy'
-	
-	input:
-	tuple val(sample), val(species), val(pop), val(prep), val(platform), path(filtered_vcf)
-	
-	output:
-	path "*.stats"
-	
-	script:
-	"""
-	
-	bgzip -d -c ${filtered_vcf} > ${sample}_${prep}_filtered.vcf && \
-	bcftools stats \
-	-F ${params.reference} \
-	-s - ${filtered_vcf} > ${filtered_vcf}.stats
-	
-	"""
-	
-}
-
-
 process MERGE_VCFS {
 	
 	tag "${prep} ${species}"
 	
-	publishDir params.merged_snps, mode: 'copy'
+	publishDir params.merged_snps, mode: 'copy', pattern: '*.txt'
 	
 	cpus 8
 	
 	input:
-	tuple path(vcf_files), val(species), val(prep)
-	path index_files
+	tuple path(vcfs), val(species), val(prep)
+	path vcf_indices
 	
 	output:
 	tuple path("*.vcf.gz"), val(species), val(prep), env(sample_size), emit: vcf
@@ -206,6 +184,38 @@ process MERGE_VCFS {
 }
 
 
+process FILTER_SNPS_BY_SAMPLE_COUNT {
+	
+	tag "${prep species}"
+	publishDir params.merged_snps, pattern: "*.vcf.gz", mode: 'copy'
+	publishDir params.merged_snps, pattern: "*.tbi", mode: 'copy'
+	
+	cpus 2
+	
+	input:
+	tuple path(vcf), val(species), val(prep), env(sample_size)
+	
+	output:
+	tuple val(sample), val(species), val(pop), val(prep), val(platform), path("${species}_${prep}_filtered.vcf.gz"), emit: vcf
+	path "*.tbi", emit: index
+	
+	script:
+	"""
+	
+	vcftools --gzvcf ${vcf} \
+	--max-alleles 2 \
+	--max-missing-count ${params.max_snp_missingness} \
+	--remove-indels \
+	--remove-filtered-all \
+	--recode --stdout \
+	| bgzip -c > "${species}_${prep}_filtered.vcf.gz" && \
+	tabix -p vcf "${species}_${prep}_filtered.vcf.gz"
+	
+	"""
+	
+}
+
+
 process MULTI_VCF_STATS {
 	
 	publishDir params.multisample_snp_stats, mode: 'copy'
@@ -219,23 +229,9 @@ process MULTI_VCF_STATS {
 	shell:
 	'''
 	
-	sample_ids=`bcftools query -l !{vcf}`
-	minInd="$((${sample_size} - !{params.max_snp_missingness}))"
-	
 	bcftools stats \
 	-F ${params.reference} \
 	-s - ${vcf} > ${vcf}.stats
-	
-	touch !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "VCF FILTER SETTINGS APPLIED TO !{prep} !{species} SNPS" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "----------------------------------------------------------" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minimum samples: ${minInd} / !{sample_size}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minimum variant quality score: !{params.min_quality}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minimum Depth: !{params.min_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Maximum Depth: !{params.max_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Sample IDs included: ${sample_ids}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
 	
 	'''
 	

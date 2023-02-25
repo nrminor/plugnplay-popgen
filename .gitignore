@@ -6,6 +6,7 @@ results*/
 resources/*.fna
 resources/*.fasta
 resources/*.fa
+resources/old_vcf_samplesheet.csv
 .nextflow.log*
 report.html*
 trace.txt*
