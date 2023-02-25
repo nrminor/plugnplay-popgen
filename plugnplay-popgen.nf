@@ -33,10 +33,12 @@ workflow {
 		SNP_QUAL_FILTERING.out.index.collect()
 	)
 	
-	// Also consider using `.filter { file(it[0]).text().split("\n")[0] != "" }` for the above channel
-	
 	FILTER_SNPS_BY_SAMPLE_COUNT {
 		MERGE_VCFS.out.vcf
+	}
+	
+	RECORD_SNP_FILTERS {
+		FILTER_SNPS_BY_SAMPLE_COUNT.out.vcf
 	}
 	
 	// MULTI_VCF_STATS (
@@ -137,12 +139,31 @@ process SNP_QUAL_FILTERING {
 	
 }
 
+process SINGLE_VCF_STATS {
+
+	publishDir params.single_sample_snp_stats, mode: 'copy'
+	
+	input:
+	tuple val(sample), val(species), val(pop), val(prep), val(platform), path(filtered_vcf)
+	
+	output:
+	path "*.stats"
+	
+	script:
+	"""
+	
+	bcftools stats \
+	-F ${params.reference} \
+	-s - ${filtered_vcf} > ${filtered_vcf}.stats
+	
+	"""
+
+}
+
 
 process MERGE_VCFS {
 	
 	tag "${prep} ${species}"
-	
-	publishDir params.merged_snps, mode: 'copy', pattern: '*.txt'
 	
 	cpus 8
 	
@@ -151,8 +172,7 @@ process MERGE_VCFS {
 	path vcf_indices
 	
 	output:
-	tuple path("*.vcf.gz"), val(species), val(prep), env(sample_size), emit: vcf
-	path "*.txt"
+	tuple path("*.vcf.gz"), val(species), val(prep), emit: vcf
 	
 	shell:
 	'''
@@ -164,21 +184,6 @@ process MERGE_VCFS {
 	--output !{species}_multisample_!{prep}.vcf.gz \
 	*!{species}*.vcf.gz
 	
-	sample_ids=`bcftools query -l !{species}_multisample_!{prep}.vcf.gz`
-	sample_size=`bcftools query -l !{species}_multisample_!{prep}.vcf.gz | wc -l`
-	minInd="$((${sample_size} - !{params.max_snp_missingness}))"
-	
-	touch !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "VCF FILTER SETTINGS APPLIED TO !{prep} !{species} SNPS" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "----------------------------------------------------------" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minimum samples: ${minInd} / ${sample_size}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minimum variant quality score: !{params.min_quality}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minimum Depth: !{params.min_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Maximum Depth: !{params.max_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Sample IDs included: ${sample_ids}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	
 	'''
 	
 }
@@ -186,17 +191,17 @@ process MERGE_VCFS {
 
 process FILTER_SNPS_BY_SAMPLE_COUNT {
 	
-	tag "${prep species}"
+	tag "${prep} ${species}"
 	publishDir params.merged_snps, pattern: "*.vcf.gz", mode: 'copy'
 	publishDir params.merged_snps, pattern: "*.tbi", mode: 'copy'
 	
 	cpus 2
 	
 	input:
-	tuple path(vcf), val(species), val(prep), env(sample_size)
+	tuple path(vcf), val(species), val(prep)
 	
 	output:
-	tuple val(sample), val(species), val(pop), val(prep), val(platform), path("${species}_${prep}_filtered.vcf.gz"), emit: vcf
+	tuple path("${species}_${prep}_filtered.vcf.gz"), val(species), val(prep), env(sample_size), emit: vcf
 	path "*.tbi", emit: index
 	
 	script:
@@ -209,9 +214,46 @@ process FILTER_SNPS_BY_SAMPLE_COUNT {
 	--remove-filtered-all \
 	--recode --stdout \
 	| bgzip -c > "${species}_${prep}_filtered.vcf.gz" && \
-	tabix -p vcf "${species}_${prep}_filtered.vcf.gz"
+	tabix -p vcf "${species}_${prep}_filtered.vcf.gz" && \
+	sample_size=`bcftools query -l ${species}_${prep}_filtered.vcf.gz | wc -l`
 	
 	"""
+	
+}
+
+
+process RECORD_SNP_FILTERS {
+	
+	tag "${prep} ${species}"
+	
+	publishDir params.merged_snps, mode: 'copy', pattern: '*.txt'
+	if ( params.stairwayplot == true ){ publishDir params.sfs_results, mode: 'copy', pattern: '*.txt' }
+	
+	cpus 1
+	
+	input:
+	tuple path(vcf), val(species), val(prep), val(sample_size)
+	
+	output:
+	path "*.txt"
+	
+	shell:
+	'''
+	sample_ids=`bcftools query -l !{vcf}`
+	minInd="$((!{sample_size} - !{params.max_snp_missingness}))"
+	
+	touch !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "VCF FILTER SETTINGS APPLIED TO !{prep} !{species} SNPS" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "----------------------------------------------------------" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum samples: ${minInd} / !{sample_size}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum variant quality score: !{params.min_quality}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Minimum Depth: !{params.min_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Maximum Depth: !{params.max_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo "Sample IDs included: " >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	echo ${sample_ids} >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
+	'''
 	
 }
 
@@ -226,14 +268,14 @@ process MULTI_VCF_STATS {
 	output:
 	path "*.stats"
 	
-	shell:
-	'''
+	script:
+	"""
 	
 	bcftools stats \
 	-F ${params.reference} \
 	-s - ${vcf} > ${vcf}.stats
 	
-	'''
+	"""
 	
 }
 
@@ -285,35 +327,20 @@ process SFS_ESTIMATION {
 	
 	output:
 	tuple path("*.sfs"), val(species), val(prep), val(sample_size), emit: sfs
-	path "*_vcf_filter_settings_*.txt", emit: vcf_filters
 	
-	shell:
-	'''
-	
-	sample_ids=`bcftools query -l !{snps}`
-	minInd="$((!{sample_size} - !{params.max_snp_missingness}))"
+	script:
+	"""
 	
 	/usr/local/bin/easysfs/easySFS.py -avf \
-	-i !{snps} \
-	-p !{species}_pop_map.txt \
+	-i ${snps} \
+	-p ${species}_pop_map.txt \
 	-o . \
 	-f \
-	--proj !{sample_size}
+	--proj ${sample_size}
 	
-	mv dadi/!{species}.sfs ./!{species}_!{params.date}.sfs
+	mv dadi/${species}.sfs ./${species}_${params.date}.sfs
 	
-	touch !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "VCF FILTER SETTINGS APPLIED TO !{prep} !{species} SNPS" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "----------------------------------------------------------" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minor allele frequency: !{params.minor_allele_frequency}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minimum samples: ${minInd} / !{sample_size}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minimum variant quality score: !{params.min_quality}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Minimum Depth: !{params.min_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Maximum Depth: !{params.max_depth}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	echo "Sample IDs included: ${sample_ids}" >> !{prep}_!{species}_vcf_filter_settings_!{params.date}.txt
-	
-	'''
+	"""
 }
 
 
@@ -442,10 +469,6 @@ process ADMIXTURE_PLOT {
 	plot_admixture.R ${output_prefix} ${params.admixture_plot_K}
 	"""
 }
-
-
-
-
 
 
 // --------------------------------------------------------------- //
