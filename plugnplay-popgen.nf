@@ -55,9 +55,15 @@ workflow {
 			.collect()
 	)
 	
-	SFS_ESTIMATION (
+	SELECT_SFS_PROJECTION (
 		FILTER_SNPS_BY_SAMPLE_COUNT.out.vcf,
 		MAKE_POP_MAP.out
+	)
+	
+	SFS_ESTIMATION (
+		FILTER_SNPS_BY_SAMPLE_COUNT.out.vcf,
+		MAKE_POP_MAP.out,
+		SELECT_SFS_PROJECTION.out
 	)
 	
 	VISUALIZE_SFS (
@@ -377,6 +383,7 @@ process SFS_ESTIMATION {
 	input:
 	tuple path(snps), val(species), val(prep), val(sample_size)
 	each path(pop_maps)
+	val projection
 	
 	output:
 	tuple path("*.sfs"), val(species), val(prep), val(sample_size), emit: sfs
@@ -388,7 +395,7 @@ process SFS_ESTIMATION {
 	-i ${snps} \
 	-p ${species}_pop_map.txt \
 	-o . \
-	--proj ${sample_size}
+	--proj ${projection}
 	
 	mv dadi/${species}.sfs ./${species}_${params.date}.sfs
 	
@@ -425,9 +432,6 @@ process BUILD_STAIRWAY_PLOT_BLUEPRINT {
 	
 	output:
 	path "*.blueprint"
-	
-	when:
-	params.stairwayplot == true
 	
 	script:
 	"""
@@ -467,14 +471,18 @@ process BUILD_STAIRWAY_PLOT_SCRIPT {
 
 process STAIRWAY_PLOT {
 	
-	publishDir params.stairway_plots, pattern: '*.pdf', mode: 'copy', overwrite: true
-	publishDir params.stairway_plots, pattern: '*.png', mode: 'copy', overwrite: true
+	publishDir params.stairway_plots, pattern: '*.final.summary.pdf', mode: 'copy', overwrite: true
+	publishDir params.stairway_plots, pattern: '*.final.summary.png', mode: 'copy', overwrite: true
+	publishDir params.stairway_plots, pattern: '*.final.summary', overwrite: true
 	
 	input:
 	path blueprint_script
 	
 	output:
 	path "*"
+	
+	when:
+	params.stairwayplot == true
 	
 	script:
 	"""

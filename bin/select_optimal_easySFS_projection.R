@@ -1,7 +1,9 @@
 #!/usr/bin/env Rscript
 
 # import projection options saved from easySFS
-options <- read.delim("projection_options.txt", header = F)
+options <- read.delim("projection_options.txt", header = F, sep = ";")
+skip <- which(grepl("best and then rerun easySFS with the", options$V1))+4
+options <- read.delim("projection_options.txt", header = F, , sep = ";",skip = skip)
 
 # Reformat those options into a data frame
 options_df <- data.frame("population" = NA,

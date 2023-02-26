@@ -65,7 +65,8 @@ RUN git clone https://github.com/isaacovercast/easySFS.git /usr/local/bin/easysf
 	chmod 777 /usr/local/bin/easysfs/easySFS.py
 
 # Set up the working directory
-WORKDIR /app
+WORKDIR /app && \
+	cp -r /usr/local/bin/stairway_plot_v2.1.1/* app/
 
 # Copy the current directory into the container
 COPY . .
