@@ -10,7 +10,6 @@ nextflow.enable.dsl = 2
 workflow {
 	
 	// Input channels
-		
 	ch_vcfs = Channel
 		.fromPath ( params.samplesheet )
 		.splitCsv ( header: true )
@@ -47,9 +46,13 @@ workflow {
 	
 	MAKE_POP_MAP (
 		ch_vcfs
-			.map { sample_id, species, population, prep_type, platform, raw_vcf -> "${sample_id}, ${species}, ${population}" }
+			.map { sample_id, species, population, prep_type, platform, raw_vcf -> 
+				sample_id.replaceAll('0', '') + "_" + sample_id.replaceAll('0', '') + ", ${species}, ${population}" }
 			.collect()
-			.collectFile( name: "pop_map.txt", newLine: true )
+			.collectFile( name: "pop_map.txt", newLine: true ),
+		FILTER_SNPS_BY_SAMPLE_COUNT.out.vcf
+			.map { vcf, species, prep, sample_size -> vcf }
+			.collect()
 	)
 	
 	SFS_ESTIMATION (
@@ -61,13 +64,17 @@ workflow {
 		SFS_ESTIMATION.out.sfs
 	)
 	
-	BUILD_STAIRWAY_PLOT_SCRIPT (
+	BUILD_STAIRWAY_PLOT_BLUEPRINT (
 		SFS_ESTIMATION.out.sfs
 	)
 	
-	// STAIRWAY_PLOT ( 
-	// 	BUILD_STAIRWAY_PLOT_SCRIPT.out
-	// )
+	BUILD_STAIRWAY_PLOT_SCRIPT (
+		BUILD_STAIRWAY_PLOT_BLUEPRINT.out
+	)
+	
+	STAIRWAY_PLOT ( 
+		BUILD_STAIRWAY_PLOT_SCRIPT.out
+	)
 	
 	// POP_STRUCTURE_PCA ( )
 	// 
@@ -95,6 +102,7 @@ params.angsd_results = params.analyses + "/" + "ANGSD_outputs"
 params.angsd_sfs_plots = params.angsd_results + "/" + "SFS_plots"
 params.stairway_plots = params.analyses + "/" + "Stairway_plots"
 params.stairway_plot_run_date = params.analyses + "/" + "Stairway_plots" + "/" + params.date
+params.stairway_plot_scripts = params.stairway_plot_run_date + "/" + "stairwayplot_scripts"
 params.admixture_results = params.analyses + "/" + "admixture_plots"
 params.pca_results = params.analyses + "/" + "PCA_plots"
 
@@ -284,32 +292,53 @@ process MAKE_POP_MAP {
 	
 	input:
 	path pop_map
+	path merged_vcfs
 	
 	output:
-	path "*.txt"
+	path "*_pop_map.txt"
 	
 	script:
 	if ( params.whole_species_mode == true ){
 		"""
-		# take first two columns of pop map
-		cut -d',' -f2 ${pop_map} | sort | uniq > species.txt
-		cut -f 1,2 -d',' ${pop_map} > tmp_pop_map.txt
+		# Create a list of different species in this dataset. Each species will get its own pop map.
+		# Then, take the first two columns of pop map, which are sample ID and species ID.
+		# Finally, use for loops to make a population map for each species, and check that each sample
+		# is actually present in the VCF.
+		cut -d',' -f2 ${pop_map} | sort | uniq > species.txt && \
+		cut -f 1,2 -d',' ${pop_map} | tr ', ' '\t' > tmp_pop_map1.txt && \
 		for i in `cat species.txt`;
 		do
-			grep -w \$i tmp_pop_map.txt > \${i}_pop_map.txt
+			bcftools query -l \${i}_*_filtered.vcf.gz > \${i}_samples.txt && \
+			grep -w \$i tmp_pop_map1.txt > tmp_pop_map2.txt && \
+			touch \${i}_pop_map.txt && \
+			for j in `cat \${i}_samples.txt`;
+			do
+				if grep -qw \$j tmp_pop_map2.txt; then
+					grep -w \$j tmp_pop_map2.txt >> \${i}_pop_map.txt
+				fi
+			done
 		done
-		rm tmp_pop_map.txt
 		"""
 	} else {
 		"""
-		# take first and third columns of pop map
-		cut -d',' -f2 ${pop_map} | sort | uniq > species.txt
-		cut -f 1,2 -d',' ${pop_map} > tmp_pop_map.txt
+		# Create a list of different species in this dataset. Each species will get its own pop map.
+		# Then, take the first and third columns of pop map, which are sample ID and population ID.
+		# Finally, use for loops to make a population map for each species, and check that each sample
+		# is actually present in the VCF.
+		cut -d',' -f2 ${pop_map} | sort | uniq > species.txt && \
+		cut -f 1,3 -d',' ${pop_map} | tr ', ' '\t' > tmp_pop_map1.txt && \
 		for i in `cat species.txt`;
 		do
-			grep -w \$i tmp_pop_map.txt > \${i}_pop_map.txt
+			bcftools query -l \${i}_*_filtered.vcf.gz > \${i}_samples.txt && \
+			grep -w \$i tmp_pop_map1.txt > tmp_pop_map2.txt && \
+			touch \${i}_pop_map.txt && \
+			for j in `cat \${i}_samples.txt`;
+			do
+				if grep -qw \$j tmp_pop_map2.txt; then
+					grep -w \$j tmp_pop_map2.txt >> \${i}_pop_map.txt
+				fi
+			done
 		done
-		rm tmp_pop_map.txt
 		"""
 	}
 }
@@ -362,15 +391,17 @@ process VISUALIZE_SFS {
 	"""
 }
 
-process BUILD_STAIRWAY_PLOT_SCRIPT {
+process BUILD_STAIRWAY_PLOT_BLUEPRINT {
 	
 	tag "${prep} ${species}"
+	
+	publishDir params.stairway_plot_scripts, mode: 'copy', overwrite: true
 	
 	input:
 	tuple path(sfs), val(species), val(prep), val(sample_size)
 	
 	output:
-	path "*.sh"
+	tuple path("*.blueprint"), val(species), val(prep)
 	
 	when:
 	params.stairwayplot == true
@@ -390,8 +421,25 @@ process BUILD_STAIRWAY_PLOT_SCRIPT {
 	${params.whether_folded} \
 	/usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/files/stairway_plot_es
 	
-	java -cp /usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/stairway_plot_es Stairbuilder ${species}_${species}_${prep}.blueprint
+	"""
 	
+}
+
+process BUILD_STAIRWAY_PLOT_SCRIPT {
+	
+	tag "${prep} ${species}"
+	
+	publishDir params.stairway_plot_scripts, mode: 'copy', overwrite: true
+	
+	input:
+	path blueprint
+	
+	output:
+	path "*.sh"
+	
+	script:
+	"""
+	java -cp /usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/stairway_plot_es Stairbuilder ${blueprint}
 	"""
 	
 }

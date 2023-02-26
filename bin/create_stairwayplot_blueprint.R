@@ -3,7 +3,7 @@ args = commandArgs(trailingOnly=TRUE)
 
 # defining the relevant input parameters based on what was specified in
 # nextflow.config, or in the command line of the workflow run
-sfs <- scan(args[1], skip =1, sep = " ")
+sfs <- as.integer(scan(args[1], skip =1, sep = " "))
 species <- as.character(args[2])
 pop <- as.character(args[3])
 prep <- as.character(args[4])
