@@ -61,9 +61,8 @@ workflow {
 	)
 	
 	SFS_ESTIMATION (
-		FILTER_SNPS_BY_SAMPLE_COUNT.out.vcf,
-		MAKE_POP_MAP.out,
-		SELECT_SFS_PROJECTION.out
+		SELECT_SFS_PROJECTION.out,
+		MAKE_POP_MAP.out.collect()
 	)
 	
 	VISUALIZE_SFS (
@@ -358,7 +357,7 @@ process SELECT_SFS_PROJECTION {
 	each path(pop_maps)
 	
 	output:
-	env projection
+	tuple path(snps), val(species), val(prep), val(sample_size), env(projection)
 	
 	script:
 	"""
@@ -381,9 +380,8 @@ process SFS_ESTIMATION {
 	publishDir params.sfs_results, mode: 'copy', overwrite: true
 	
 	input:
-	tuple path(snps), val(species), val(prep), val(sample_size)
-	each path(pop_maps)
-	val projection
+	tuple path(snps), val(species), val(prep), val(sample_size), val(projection)
+	path pop_maps
 	
 	output:
 	tuple path("*.sfs"), val(species), val(prep), val(sample_size), emit: sfs
@@ -433,6 +431,9 @@ process BUILD_STAIRWAY_PLOT_BLUEPRINT {
 	output:
 	path "*.blueprint"
 	
+	when:
+	params.stairwayplot == true
+	
 	script:
 	"""
 	
@@ -446,7 +447,8 @@ process BUILD_STAIRWAY_PLOT_BLUEPRINT {
 	${params.mutation_rate} \
 	${params.random_seed} \
 	${params.whether_folded} \
-	/usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/files/stairway_plot_es
+	${params.stairway_plot_scripts} \
+	/usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/stairway_plot_es
 	
 	"""
 	
@@ -481,12 +483,10 @@ process STAIRWAY_PLOT {
 	output:
 	path "*"
 	
-	when:
-	params.stairwayplot == true
-	
 	script:
+	script_name = blueprint_script.getName()
 	"""
-	bash ${blueprint_script}
+	bash "${params.stairway_plot_scripts}/${script_name}"
 	"""
 	
 }

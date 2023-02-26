@@ -15,7 +15,8 @@ year_per_generation <- as.numeric(args[7])
 mutation_rate <- as.character(args[8])
 random_seed <- as.numeric(args[9])
 whether_folded <- as.logical(args[10])
-path_to_stairway_plot <- as.character(args[11])
+project_dir <- as.character(args[11])
+path_to_stairway_plot <- as.character(args[12])
 
 # creating a dataframe that will be filled out into the Stairway plot blueprint
 # file
@@ -39,7 +40,7 @@ blueprint <- rbind(blueprint,
 # Adding largest SFS bin to be used
 blueprint <- rbind(blueprint, 
 				   paste("largest_size_of_SFS_bin_used_for_estimation: ", 
-						 as.character(sample_size/2), sep = ""))
+						 as.character(as.integer(sample_size/2)), sep = ""))
 
 # Adding model training proportion
 blueprint <- rbind(blueprint, paste("pct_training: ", 0.67, sep = ""))
@@ -52,7 +53,7 @@ blueprint <- rbind(blueprint,
 						 sep = " "))
 
 # Adding input directory
-blueprint <- rbind(blueprint, paste("project_dir: ", getwd(), sep = ""))
+blueprint <- rbind(blueprint, paste("project_dir: ", project_dir, sep = ""))
 
 # Adding Stairway plot software directory
 blueprint <- rbind(blueprint, paste("stairway_plot_dir: ", 
