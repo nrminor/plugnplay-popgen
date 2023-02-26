@@ -15,8 +15,8 @@ year_per_generation <- as.numeric(args[7])
 mutation_rate <- as.character(args[8])
 random_seed <- as.numeric(args[9])
 whether_folded <- as.logical(args[10])
-project_dir <- as.character(args[11])
-path_to_stairway_plot <- as.character(args[12])
+# project_dir <- as.character(args[11])
+# path_to_stairway_plot <- as.character(args[12])
 
 # creating a dataframe that will be filled out into the Stairway plot blueprint
 # file
@@ -53,11 +53,11 @@ blueprint <- rbind(blueprint,
 						 sep = " "))
 
 # Adding input directory
-blueprint <- rbind(blueprint, paste("project_dir: ", project_dir, sep = ""))
+blueprint <- rbind(blueprint, paste("project_dir: ", getwd(), sep = ""))
 
 # Adding Stairway plot software directory
 blueprint <- rbind(blueprint, paste("stairway_plot_dir: ", 
-				   path_to_stairway_plot, sep = ""))
+				   getwd(), "/stairway_plot_es", sep = ""))
 
 # Adding number of input files for estimation line
 blueprint <- rbind(blueprint, paste("ninput: 200", sep = ""))

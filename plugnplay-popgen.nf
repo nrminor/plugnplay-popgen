@@ -69,17 +69,21 @@ workflow {
 		SFS_ESTIMATION.out.sfs
 	)
 	
-	BUILD_STAIRWAY_PLOT_BLUEPRINT (
+	STAIRWAY_PLOT ( 
 		SFS_ESTIMATION.out.sfs
 	)
 	
-	BUILD_STAIRWAY_PLOT_SCRIPT (
-		BUILD_STAIRWAY_PLOT_BLUEPRINT.out
-	)
-	
-	STAIRWAY_PLOT ( 
-		BUILD_STAIRWAY_PLOT_SCRIPT.out
-	)
+	// BUILD_STAIRWAY_PLOT_BLUEPRINT (
+	// 	SFS_ESTIMATION.out.sfs
+	// )
+	// 
+	// BUILD_STAIRWAY_PLOT_SCRIPT (
+	// 	BUILD_STAIRWAY_PLOT_BLUEPRINT.out
+	// )
+	// 
+	// STAIRWAY_PLOT ( 
+	// 	BUILD_STAIRWAY_PLOT_SCRIPT.out
+	// )
 	
 	// POP_STRUCTURE_PCA ( )
 	// 
@@ -419,17 +423,18 @@ process VISUALIZE_SFS {
 	"""
 }
 
-process BUILD_STAIRWAY_PLOT_BLUEPRINT {
+process STAIRWAY_PLOT {
 	
 	tag "${prep} ${species}"
 	
-	publishDir params.stairway_plot_scripts, mode: 'copy', overwrite: true
+	publishDir params.stairway_plot_scripts, pattern: "*.blueprint", mode: 'copy', overwrite: true
+	publishDir params.stairway_plots, pattern: "*.final.summary*", mode: 'copy', overwrite: true
 	
 	input:
 	tuple path(sfs), val(species), val(prep), val(sample_size)
 	
 	output:
-	path "*.blueprint"
+	path "*${species}_${prep}*"
 	
 	when:
 	params.stairwayplot == true
@@ -437,6 +442,7 @@ process BUILD_STAIRWAY_PLOT_BLUEPRINT {
 	script:
 	"""
 	
+	# create stairway plot blueprint based on VCF and settings in nextflow.config
 	create_stairwayplot_blueprint.R ${sfs} \
 	${species} \
 	${species} \
@@ -446,50 +452,73 @@ process BUILD_STAIRWAY_PLOT_BLUEPRINT {
 	${params.year_per_generation} \
 	${params.mutation_rate} \
 	${params.random_seed} \
-	${params.whether_folded} \
-	${params.stairway_plot_scripts} \
-	/usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/stairway_plot_es
+	${params.whether_folded}
+	
+	# Pull stairway plot files
+	wget https://github.com/xiaoming-liu/stairway-plot-v2/raw/master/stairway_plot_v2.1.1.zip && \
+	unzip -o stairway_plot_v2.1.1.zip -d . && \
+	rm stairway_plot_v2.1.1.zip && \
+	mv stairway_plot_v2.1.1/stairway_plot_es/ . && \
+	rm -rf stairway_plot_v2.1.1/
+	
+	# create stairway plot shell script
+	java -cp stairway_plot_es Stairbuilder ${species}_${species}_${prep}.blueprint
+	
+	# create stairway plot plotting shell script
+	java -cp stairway_plot_es Stairpainter ${species}_${species}_${prep}.blueprint
+	
+	# run stairway plot
+	bash ${species}_${species}_${prep}.blueprint.sh
+	
+	# error out if summary files don't exist
+	if [ \$(find . -maxdepth 1 -type f -name "*.final.summary*" | wc -l) -eq 0 ]; then
+		error 1
+	fi
 	
 	"""
 	
 }
 
-process BUILD_STAIRWAY_PLOT_SCRIPT {
-	
-	publishDir params.stairway_plot_scripts, mode: 'copy', overwrite: true
-	
-	input:
-	path blueprint
-	
-	output:
-	path "*.sh"
-	
-	script:
-	"""
-	java -cp /usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/stairway_plot_es Stairbuilder ${blueprint}
-	"""
-	
-}
-
-process STAIRWAY_PLOT {
-	
-	publishDir params.stairway_plots, pattern: '*.final.summary.pdf', mode: 'copy', overwrite: true
-	publishDir params.stairway_plots, pattern: '*.final.summary.png', mode: 'copy', overwrite: true
-	publishDir params.stairway_plots, pattern: '*.final.summary', overwrite: true
-	
-	input:
-	path blueprint_script
-	
-	output:
-	path "*"
-	
-	script:
-	script_name = blueprint_script.getName()
-	"""
-	bash "${params.stairway_plot_scripts}/${script_name}"
-	"""
-	
-}
+// process BUILD_STAIRWAY_PLOT_SCRIPT {
+// 	
+// 	publishDir params.stairway_plot_scripts, mode: 'copy', overwrite: true
+// 	
+// 	input:
+// 	path blueprint
+// 	
+// 	output:
+// 	path "*"
+// 	
+// 	script:
+// 	"""
+// 	java -cp /usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/stairway_plot_es Stairbuilder ${blueprint}
+// 	"""
+// 	
+// }
+// 
+// process STAIRWAY_PLOT {
+// 	
+// 	publishDir params.stairway_plots, pattern: '*.final.summary.pdf', mode: 'copy', overwrite: true
+// 	publishDir params.stairway_plots, pattern: '*.final.summary.png', mode: 'copy', overwrite: true
+// 	publishDir params.stairway_plots, pattern: '*.final.summary', overwrite: true
+// 	
+// 	input:
+// 	path blueprint_script
+// 	
+// 	output:
+// 	path "*"
+// 	
+// 	script:
+// 	script_name = blueprint_script.getName()
+// 	"""
+// 	wget https://github.com/xiaoming-liu/stairway-plot-v2/raw/master/stairway_plot_v2.1.1.zip && \
+// 	unzip -o stairway_plot_v2.1.1.zip -d . && \
+// 	rm stairway_plot_v2.1.1.zip && \
+// 	mv stairway_plot_v2.1.1/stairway_plot_es/ . && \
+// 	bash ${blueprint_script}
+// 	"""
+// 	
+// }
 
 process POP_STRUCTURE_PCA {
 	
