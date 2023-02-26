@@ -428,6 +428,7 @@ process STAIRWAY_PLOT {
 	tag "${prep} ${species}"
 	
 	publishDir params.stairway_plot_scripts, pattern: "*.blueprint", mode: 'copy', overwrite: true
+	publishDir params.stairway_plot_scripts, pattern: "*.blueprint.sh", mode: 'copy', overwrite: true
 	publishDir params.stairway_plots, pattern: "*.final.summary*", mode: 'copy', overwrite: true
 	
 	input:
@@ -461,13 +462,8 @@ process STAIRWAY_PLOT {
 	mv stairway_plot_v2.1.1/stairway_plot_es/ . && \
 	rm -rf stairway_plot_v2.1.1/
 	
-	# create stairway plot shell script
-	java -cp stairway_plot_es Stairbuilder ${species}_${species}_${prep}.blueprint
-	
-	# create stairway plot plotting shell script
-	java -cp stairway_plot_es Stairpainter ${species}_${species}_${prep}.blueprint
-	
-	# run stairway plot
+	# create stairway plot shell script and then run it
+	java -cp stairway_plot_es Stairbuilder ${species}_${species}_${prep}.blueprint && \
 	bash ${species}_${species}_${prep}.blueprint.sh
 	
 	# error out if summary files don't exist

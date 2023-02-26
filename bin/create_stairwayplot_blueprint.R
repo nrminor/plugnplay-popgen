@@ -63,7 +63,7 @@ blueprint <- rbind(blueprint, paste("stairway_plot_dir: ",
 blueprint <- rbind(blueprint, paste("ninput: 200", sep = ""))
 
 # Adding random seed line
-blueprint <- rbind(blueprint, paste("ninput: ", random_seed, sep = ""))
+blueprint <- rbind(blueprint, paste("random_seed: ", random_seed, sep = ""))
 
 # Adding mutation rate line
 blueprint <- rbind(blueprint, paste("mu: ", mutation_rate, sep = ""))
