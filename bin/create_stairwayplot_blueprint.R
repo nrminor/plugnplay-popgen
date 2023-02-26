@@ -9,7 +9,7 @@ pop <- as.character(args[3])
 prep <- as.character(args[4])
 sample_size <- as.numeric(args[5])
 sfs <- sfs[1:round(sample_size/2)]
-sfs <- paste(sfs, collapse = ", ")
+sfs <- paste(sfs, collapse = " ")
 genome_length <- as.numeric(args[6])
 year_per_generation <- as.numeric(args[7])
 mutation_rate <- as.character(args[8])

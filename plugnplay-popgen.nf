@@ -101,8 +101,7 @@ params.sfs_results = params.analyses + "/" + "site_frequency_spectra"
 params.angsd_results = params.analyses + "/" + "ANGSD_outputs"
 params.angsd_sfs_plots = params.angsd_results + "/" + "SFS_plots"
 params.stairway_plots = params.analyses + "/" + "Stairway_plots"
-params.stairway_plot_run_date = params.analyses + "/" + "Stairway_plots" + "/" + params.date
-params.stairway_plot_scripts = params.stairway_plot_run_date + "/" + "stairwayplot_scripts"
+params.stairway_plot_scripts = params.stairway_plots + "/" + "stairwayplot_scripts"
 params.admixture_results = params.analyses + "/" + "admixture_plots"
 params.pca_results = params.analyses + "/" + "PCA_plots"
 
@@ -344,6 +343,31 @@ process MAKE_POP_MAP {
 }
 
 
+process SELECT_SFS_PROJECTION {
+	
+	tag "${prep} ${species}"
+	
+	input:
+	tuple path(snps), val(species), val(prep), val(sample_size)
+	each path(pop_maps)
+	
+	output:
+	env projection
+	
+	script:
+	"""
+	
+	/usr/local/bin/easysfs/easySFS.py -avf \
+	-i ${snps} \
+	-p ${species}_pop_map.txt \
+	--preview > projection_options.txt && \
+	select_optimal_easySFS_projection.R && \
+	projection=`cat projection.txt`
+	
+	"""
+}
+
+
 process SFS_ESTIMATION {
 	
 	tag "${prep} ${species}"
@@ -364,7 +388,6 @@ process SFS_ESTIMATION {
 	-i ${snps} \
 	-p ${species}_pop_map.txt \
 	-o . \
-	-f \
 	--proj ${sample_size}
 	
 	mv dadi/${species}.sfs ./${species}_${params.date}.sfs
@@ -401,7 +424,7 @@ process BUILD_STAIRWAY_PLOT_BLUEPRINT {
 	tuple path(sfs), val(species), val(prep), val(sample_size)
 	
 	output:
-	tuple path("*.blueprint"), val(species), val(prep)
+	path "*.blueprint"
 	
 	when:
 	params.stairwayplot == true
@@ -409,7 +432,7 @@ process BUILD_STAIRWAY_PLOT_BLUEPRINT {
 	script:
 	"""
 	
-	create_stairwayplot_script.R ${sfs} \
+	create_stairwayplot_blueprint.R ${sfs} \
 	${species} \
 	${species} \
 	${prep} \
@@ -426,8 +449,6 @@ process BUILD_STAIRWAY_PLOT_BLUEPRINT {
 }
 
 process BUILD_STAIRWAY_PLOT_SCRIPT {
-	
-	tag "${prep} ${species}"
 	
 	publishDir params.stairway_plot_scripts, mode: 'copy', overwrite: true
 	
@@ -446,8 +467,8 @@ process BUILD_STAIRWAY_PLOT_SCRIPT {
 
 process STAIRWAY_PLOT {
 	
-	publishDir params.stairway_plot_run_date, pattern: '*.pdf', mode: 'move', overwrite: true
-	publishDir params.stairway_plot_run_date, pattern: '*.png', mode: 'move', overwrite: true
+	publishDir params.stairway_plots, pattern: '*.pdf', mode: 'copy', overwrite: true
+	publishDir params.stairway_plots, pattern: '*.png', mode: 'copy', overwrite: true
 	
 	input:
 	path blueprint_script
