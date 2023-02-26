@@ -13,6 +13,7 @@ for (i in which(!grepl(",", options$V1))){
   
   option_vector <- options$V1[i+1]
   option_vector <- unlist(strsplit(option_vector, " "))
+  option_vector <- unlist(strsplit(option_vector, "\t"))
   option_vector <- unlist(strsplit(option_vector, "(", fixed = T))
   option_vector <- unlist(strsplit(option_vector, ")", fixed = T))
   option_vector <- unlist(strsplit(option_vector, ","))
