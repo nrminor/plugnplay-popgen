@@ -475,46 +475,34 @@ process STAIRWAY_PLOT {
 	
 }
 
-// process BUILD_STAIRWAY_PLOT_SCRIPT {
-// 	
-// 	publishDir params.stairway_plot_scripts, mode: 'copy', overwrite: true
+
+// process CREATE_SUBSAMPLING_GUIDES {
 // 	
 // 	input:
-// 	path blueprint
+// 	path pop_map
 // 	
 // 	output:
-// 	path "*"
+// 	
+// 	
+// 	when:
+// 	params.subsampling_bias_assessment == true
 // 	
 // 	script:
 // 	"""
-// 	java -cp /usr/local/bin/stairway_plot_v2.1.1/stairway_plot_v2.1.1/stairway_plot_es Stairbuilder ${blueprint}
+// 	subsampling.R ${pop_map) ${params.random_seed}
 // 	"""
 // 	
 // }
-// 
-// process STAIRWAY_PLOT {
-// 	
-// 	publishDir params.stairway_plots, pattern: '*.final.summary.pdf', mode: 'copy', overwrite: true
-// 	publishDir params.stairway_plots, pattern: '*.final.summary.png', mode: 'copy', overwrite: true
-// 	publishDir params.stairway_plots, pattern: '*.final.summary', overwrite: true
-// 	
-// 	input:
-// 	path blueprint_script
-// 	
-// 	output:
-// 	path "*"
-// 	
-// 	script:
-// 	script_name = blueprint_script.getName()
-// 	"""
-// 	wget https://github.com/xiaoming-liu/stairway-plot-v2/raw/master/stairway_plot_v2.1.1.zip && \
-// 	unzip -o stairway_plot_v2.1.1.zip -d . && \
-// 	rm stairway_plot_v2.1.1.zip && \
-// 	mv stairway_plot_v2.1.1/stairway_plot_es/ . && \
-// 	bash ${blueprint_script}
-// 	"""
-// 	
-// }
+
+
+// process SELECT_SUBSAMPLED_SFS_PROJ {}
+
+
+// process ESTIMATE_SUBSAMPLED_SFS {}
+
+
+// process SUBSAMPLED_STAIRWAY_PLOT {}
+
 
 process POP_STRUCTURE_PCA {
 	
