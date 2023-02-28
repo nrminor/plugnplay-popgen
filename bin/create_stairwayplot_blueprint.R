@@ -29,6 +29,12 @@ blueprint <- rbind(blueprint, paste("popid: ", species, "_",
 # Adding sample size line
 blueprint <- rbind(blueprint, paste("nseq: ", sample_size, sep = ""))
 
+# Adding number of sites line
+blueprint <- rbind(blueprint, paste("L: ", genome_length, sep = ""))
+
+# Adding whether folded SFS line
+blueprint <- rbind(blueprint, paste("whether_folded: ", whether_folded, sep = ""))
+
 # Adding SFS line
 blueprint <- rbind(blueprint, paste("SFS: ", sfs, sep = ""))
 
